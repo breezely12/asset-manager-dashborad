@@ -266,12 +266,19 @@ function renderMonthlyBars(svgId, legendId, months) {
 function renderGoalsList(goalsData) {
   const list = document.getElementById("goalsList");
   list.innerHTML = "";
+  const currentYear = new Date().getFullYear();
+  document.getElementById("goalsCurrentYear").textContent = `현재 ${currentYear}년`;
   goalsData.goals.forEach((g) => {
     const pct = Math.max(g.progress_pct ?? 0, 0);
     const fillPct = Math.min(pct, 100);
     const li = document.createElement("li");
     li.className = "goal-row";
-    const yearLabel = g.target_year ? `${g.target_year}년 · ${g.age}세` : `${g.age}세`;
+    let yearsNote = "";
+    if (g.target_year) {
+      const diff = g.target_year - currentYear;
+      yearsNote = g.achieved ? " · 달성" : diff > 0 ? ` · ${diff}년 후` : diff === 0 ? " · 올해" : ` · ${-diff}년 지남`;
+    }
+    const yearLabel = g.target_year ? `${g.target_year}년 · ${g.age}세${yearsNote}` : `${g.age}세`;
     li.innerHTML = `
       <div class="goal-label">${g.label || "목표"}<div class="goal-year">${yearLabel}</div></div>
       <div class="goal-track"><div class="goal-fill ${g.achieved ? "achieved" : ""}" style="width:${fillPct}%"></div></div>
