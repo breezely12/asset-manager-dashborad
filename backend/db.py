@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     category TEXT NOT NULL,
     amount REAL NOT NULL,
     memo TEXT,
+    kind TEXT NOT NULL DEFAULT 'ledger' CHECK(kind IN ('ledger', 'investment')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -73,6 +74,11 @@ def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        tx_columns = {row["name"] for row in conn.execute("PRAGMA table_info(transactions)")}
+        if "kind" not in tx_columns:
+            conn.execute(
+                "ALTER TABLE transactions ADD COLUMN kind TEXT NOT NULL DEFAULT 'ledger'"
+            )
         if conn.execute("SELECT COUNT(*) FROM goals").fetchone()[0] == 0:
             conn.executemany(
                 "INSERT INTO goals (age, target_krw, label) VALUES (?, ?, ?)", _DEFAULT_GOALS

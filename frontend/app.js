@@ -533,9 +533,10 @@ async function loadLedger() {
 document.getElementById("ledgerMonth").addEventListener("change", loadLedger);
 
 const txModal = document.getElementById("txModal");
-function openTxModal(t) {
+function openTxModal(t, kind) {
   document.getElementById("txModalTitle").textContent = t ? "내역 수정" : "내역 추가";
   document.getElementById("t_id").value = t?.id ?? "";
+  document.getElementById("t_kind").value = t?.kind ?? kind ?? "ledger";
   document.getElementById("t_date").value = t?.date ?? new Date().toISOString().slice(0, 10);
   document.getElementById("t_type").value = t?.type ?? "expense";
   document.getElementById("t_category").value = t?.category ?? "";
@@ -543,24 +544,62 @@ function openTxModal(t) {
   document.getElementById("t_memo").value = t?.memo ?? "";
   txModal.classList.remove("hidden");
 }
-document.getElementById("addTxBtn").addEventListener("click", () => openTxModal(null));
+document.getElementById("addTxBtn").addEventListener("click", () => openTxModal(null, "ledger"));
+document.getElementById("addInvestmentBtn").addEventListener("click", () => openTxModal(null, "investment"));
 document.getElementById("txCancelBtn").addEventListener("click", () => txModal.classList.add("hidden"));
 document.getElementById("txForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("t_id").value;
+  const kind = document.getElementById("t_kind").value;
   const body = {
     date: document.getElementById("t_date").value,
     type: document.getElementById("t_type").value,
     category: document.getElementById("t_category").value,
     amount: parseFloat(document.getElementById("t_amount").value),
     memo: document.getElementById("t_memo").value || null,
+    kind,
   };
   if (id) await api(`/transactions/${id}`, { method: "PUT", body: JSON.stringify(body) });
   else await api("/transactions", { method: "POST", body: JSON.stringify(body) });
   txModal.classList.add("hidden");
-  loadLedger();
+  if (kind === "investment") loadInvestments();
+  else loadLedger();
   loadOverview();
 });
+
+// ---------- investments ----------
+async function loadInvestments() {
+  const [items, summary] = await Promise.all([
+    api("/investments"),
+    api("/investments/summary"),
+  ]);
+
+  document.getElementById("investmentIncome").textContent = fmtKRW(summary.income);
+  document.getElementById("investmentExpense").textContent = fmtKRW(summary.expense);
+  const netEl = document.getElementById("investmentNet");
+  netEl.textContent = fmtSigned(summary.net);
+  netEl.className = "stat-value " + (summary.net >= 0 ? "good" : "critical");
+
+  const tbody = document.querySelector("#investmentTable tbody");
+  tbody.innerHTML = "";
+  items.forEach((t) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${t.date}</td>
+      <td>${t.type === "income" ? "입금" : "출금"}</td>
+      <td>${t.category}</td>
+      <td>${fmtKRW(t.amount)}</td>
+      <td>${t.memo ?? ""}</td>
+      <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
+    `;
+    tr.querySelector(".edit-btn").addEventListener("click", () => openTxModal(t, "investment"));
+    tr.querySelector(".del-btn").addEventListener("click", async () => {
+      if (confirm("삭제할까요?")) { await api(`/transactions/${t.id}`, { method: "DELETE" }); loadInvestments(); }
+    });
+    tbody.appendChild(tr);
+  });
+}
+document.querySelector('.tab-btn[data-tab="investment"]').addEventListener("click", loadInvestments);
 
 // ---------- yearly report ----------
 async function loadYearlyYears() {
@@ -607,3 +646,4 @@ loadHoldings();
 loadLiabilities();
 loadLedger();
 loadYearlyYears().then(loadYearly);
+loadInvestments();

@@ -82,6 +82,7 @@ class TransactionIn(BaseModel):
     category: str
     amount: float
     memo: Optional[str] = None
+    kind: Literal["ledger", "investment"] = "ledger"
 
 
 class GoalIn(BaseModel):
@@ -300,12 +301,12 @@ def list_snapshots():
 # ---------- transactions (household ledger) ----------
 
 @app.get("/api/transactions")
-def list_transactions(month: Optional[str] = None):
-    query = "SELECT * FROM transactions"
-    params: tuple = ()
+def list_transactions(month: Optional[str] = None, kind: str = "ledger"):
+    query = "SELECT * FROM transactions WHERE kind = ?"
+    params: list = [kind]
     if month:
-        query += " WHERE date LIKE ?"
-        params = (f"{month}%",)
+        query += " AND date LIKE ?"
+        params.append(f"{month}%")
     query += " ORDER BY date DESC, id DESC"
     with get_conn() as conn:
         rows = [dict(r) for r in conn.execute(query, params)]
@@ -316,8 +317,8 @@ def list_transactions(month: Optional[str] = None):
 def create_transaction(body: TransactionIn):
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO transactions (date, type, category, amount, memo) VALUES (?, ?, ?, ?, ?)",
-            (body.date, body.type, body.category, body.amount, body.memo),
+            "INSERT INTO transactions (date, type, category, amount, memo, kind) VALUES (?, ?, ?, ?, ?, ?)",
+            (body.date, body.type, body.category, body.amount, body.memo, body.kind),
         )
         return {"id": cur.lastrowid}
 
@@ -329,8 +330,8 @@ def update_transaction(tx_id: int, body: TransactionIn):
         if not existing:
             raise HTTPException(404, "Transaction not found")
         conn.execute(
-            "UPDATE transactions SET date=?, type=?, category=?, amount=?, memo=? WHERE id=?",
-            (body.date, body.type, body.category, body.amount, body.memo, tx_id),
+            "UPDATE transactions SET date=?, type=?, category=?, amount=?, memo=?, kind=? WHERE id=?",
+            (body.date, body.type, body.category, body.amount, body.memo, body.kind, tx_id),
         )
     return {"ok": True}
 
@@ -343,13 +344,13 @@ def delete_transaction(tx_id: int):
 
 
 @app.get("/api/transactions/summary")
-def transactions_summary(month: str):
+def transactions_summary(month: str, kind: str = "ledger"):
     with get_conn() as conn:
         rows = [
             dict(r)
             for r in conn.execute(
-                "SELECT type, category, amount FROM transactions WHERE date LIKE ?",
-                (f"{month}%",),
+                "SELECT type, category, amount FROM transactions WHERE kind = ? AND date LIKE ?",
+                (kind, f"{month}%"),
             )
         ]
     income = sum(r["amount"] for r in rows if r["type"] == "income")
@@ -362,22 +363,23 @@ def transactions_summary(month: str):
 
 
 @app.get("/api/transactions/years")
-def transaction_years():
+def transaction_years(kind: str = "ledger"):
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT DISTINCT substr(date, 1, 4) AS year FROM transactions ORDER BY year DESC"
+            "SELECT DISTINCT substr(date, 1, 4) AS year FROM transactions WHERE kind = ? ORDER BY year DESC",
+            (kind,),
         ).fetchall()
     return [r["year"] for r in rows]
 
 
 @app.get("/api/transactions/yearly")
-def transactions_yearly(year: str):
+def transactions_yearly(year: str, kind: str = "ledger"):
     with get_conn() as conn:
         rows = [
             dict(r)
             for r in conn.execute(
-                "SELECT date, type, category, amount FROM transactions WHERE date LIKE ?",
-                (f"{year}-%",),
+                "SELECT date, type, category, amount FROM transactions WHERE kind = ? AND date LIKE ?",
+                (kind, f"{year}-%"),
             )
         ]
     months = []
@@ -403,6 +405,39 @@ def transactions_yearly(year: str):
         "total_expense": total_expense,
         "net": total_income - total_expense,
     }
+
+
+# ---------- investments (large/irregular transfers kept out of the household ledger) ----------
+
+@app.get("/api/investments")
+def list_investments():
+    with get_conn() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM transactions WHERE kind = 'investment' ORDER BY date DESC, id DESC"
+            )
+        ]
+    return rows
+
+
+@app.get("/api/investments/summary")
+def investments_summary():
+    with get_conn() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT type, category, amount FROM transactions WHERE kind = 'investment'"
+            )
+        ]
+    income = sum(r["amount"] for r in rows if r["type"] == "income")
+    expense = sum(r["amount"] for r in rows if r["type"] == "expense")
+    by_category: dict[str, float] = {}
+    for r in rows:
+        by_category[r["category"]] = by_category.get(r["category"], 0.0) + (
+            r["amount"] if r["type"] == "income" else -r["amount"]
+        )
+    return {"income": income, "expense": expense, "net": income - expense, "by_category": by_category}
 
 
 # ---------- goals & settings ----------

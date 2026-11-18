@@ -21,6 +21,7 @@
     <button class="tab-btn" data-tab="holdings">자산 목록</button>
     <button class="tab-btn" data-tab="ledger">가계부</button>
     <button class="tab-btn" data-tab="yearly">연간 리포트</button>
+    <button class="tab-btn" data-tab="investment">투자</button>
   </nav>
 
   <!-- OVERVIEW -->
@@ -183,6 +184,39 @@
     </div>
   </section>
 
+  <!-- INVESTMENT -->
+  <section id="tab-investment" class="tab-panel">
+    <div class="panel-header">
+      <h2>투자 / 대규모 거래</h2>
+      <div class="header-actions">
+        <button id="addInvestmentBtn" class="btn btn-primary">+ 거래 추가</button>
+      </div>
+    </div>
+    <p class="muted">일상 가계부와 분리해서 관리하는 대규모·비정기 거래입니다. 필요 없는 항목은 삭제하세요.</p>
+
+    <div class="stat-row">
+      <div class="stat-tile">
+        <div class="stat-label">총 입금</div>
+        <div class="stat-value" id="investmentIncome">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">총 출금</div>
+        <div class="stat-value" id="investmentExpense">-</div>
+      </div>
+      <div class="stat-tile stat-tile-primary">
+        <div class="stat-label">순액</div>
+        <div class="stat-value" id="investmentNet">-</div>
+      </div>
+    </div>
+
+    <table class="data-table" id="investmentTable">
+      <thead>
+        <tr><th>날짜</th><th>구분</th><th>카테고리</th><th>금액</th><th>메모</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
 <!-- Holding modal -->
 <div id="holdingModal" class="modal-backdrop hidden">
   <div class="modal">
@@ -239,6 +273,7 @@
     <h3 id="txModalTitle">내역 추가</h3>
     <form id="txForm">
       <input type="hidden" id="t_id" />
+      <input type="hidden" id="t_kind" value="ledger" />
       <label>날짜 <input type="date" id="t_date" required /></label>
       <label>구분
         <select id="t_type">
