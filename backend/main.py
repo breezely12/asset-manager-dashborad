@@ -84,6 +84,7 @@ class TransactionIn(BaseModel):
     memo: Optional[str] = None
     kind: Literal["ledger", "investment"] = "ledger"
     payment_method: Optional[str] = None
+    count_in_total: bool = True
 
 
 class GoalIn(BaseModel):
@@ -318,8 +319,9 @@ def list_transactions(month: Optional[str] = None, kind: str = "ledger"):
 def create_transaction(body: TransactionIn):
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO transactions (date, type, category, amount, memo, kind, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (body.date, body.type, body.category, body.amount, body.memo, body.kind, body.payment_method),
+            "INSERT INTO transactions (date, type, category, amount, memo, kind, payment_method, count_in_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (body.date, body.type, body.category, body.amount, body.memo, body.kind,
+             body.payment_method, int(body.count_in_total)),
         )
         return {"id": cur.lastrowid}
 
@@ -331,8 +333,9 @@ def update_transaction(tx_id: int, body: TransactionIn):
         if not existing:
             raise HTTPException(404, "Transaction not found")
         conn.execute(
-            "UPDATE transactions SET date=?, type=?, category=?, amount=?, memo=?, kind=?, payment_method=? WHERE id=?",
-            (body.date, body.type, body.category, body.amount, body.memo, body.kind, body.payment_method, tx_id),
+            "UPDATE transactions SET date=?, type=?, category=?, amount=?, memo=?, kind=?, payment_method=?, count_in_total=? WHERE id=?",
+            (body.date, body.type, body.category, body.amount, body.memo, body.kind,
+             body.payment_method, int(body.count_in_total), tx_id),
         )
     return {"ok": True}
 
@@ -350,7 +353,7 @@ def transactions_summary(month: str, kind: str = "ledger"):
         rows = [
             dict(r)
             for r in conn.execute(
-                "SELECT type, category, amount FROM transactions WHERE kind = ? AND date LIKE ?",
+                "SELECT type, category, amount FROM transactions WHERE kind = ? AND count_in_total = 1 AND date LIKE ?",
                 (kind, f"{month}%"),
             )
         ]
@@ -379,7 +382,7 @@ def transactions_yearly(year: str, kind: str = "ledger"):
         rows = [
             dict(r)
             for r in conn.execute(
-                "SELECT date, type, category, amount FROM transactions WHERE kind = ? AND date LIKE ?",
+                "SELECT date, type, category, amount FROM transactions WHERE kind = ? AND count_in_total = 1 AND date LIKE ?",
                 (kind, f"{year}-%"),
             )
         ]

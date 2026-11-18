@@ -538,10 +538,12 @@ async function loadLedger() {
   tbody.innerHTML = "";
   txs.forEach((t) => {
     const tr = document.createElement("tr");
+    if (!t.count_in_total) tr.className = "muted";
+    const excludedTag = t.count_in_total ? "" : ' <span class="muted">(합계 제외)</span>';
     tr.innerHTML = `
       <td>${t.date}</td>
       <td>${t.type === "income" ? "수입" : "지출"}</td>
-      <td>${t.category}</td>
+      <td>${t.category}${excludedTag}</td>
       <td>${t.payment_method ?? ""}</td>
       <td>${fmtKRW(t.amount)}</td>
       <td>${t.memo ?? ""}</td>
@@ -600,6 +602,7 @@ function openTxModal(t, kind) {
   document.getElementById("t_payment_method").value = t?.payment_method ?? "";
   document.getElementById("t_amount").value = t?.amount ?? "";
   document.getElementById("t_memo").value = t?.memo ?? "";
+  document.getElementById("t_count_in_total").checked = t ? !!t.count_in_total : true;
   txModal.classList.remove("hidden");
 }
 document.getElementById("addTxBtn").addEventListener("click", () => openTxModal(null, "ledger"));
@@ -617,6 +620,7 @@ document.getElementById("txForm").addEventListener("submit", async (e) => {
     amount: parseFloat(document.getElementById("t_amount").value),
     memo: document.getElementById("t_memo").value || null,
     payment_method: document.getElementById("t_payment_method").value || null,
+    count_in_total: document.getElementById("t_count_in_total").checked,
     kind,
   };
   if (id) await api(`/transactions/${id}`, { method: "PUT", body: JSON.stringify(body) });

@@ -301,6 +301,10 @@
       </label>
       <label>금액 <input type="number" step="any" id="t_amount" required /></label>
       <label>메모 <input type="text" id="t_memo" /></label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="t_count_in_total" checked />
+        합계에 포함 (해제하면 목록엔 보이되 수입/지출 합계·차트에서 제외)
+      </label>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="txCancelBtn">취소</button>
         <button type="submit" class="btn btn-primary">저장</button>
