@@ -236,8 +236,9 @@
 <!-- Transaction modal -->
 <div id="txModal" class="modal-backdrop hidden">
   <div class="modal">
-    <h3>내역 추가</h3>
+    <h3 id="txModalTitle">내역 추가</h3>
     <form id="txForm">
+      <input type="hidden" id="t_id" />
       <label>날짜 <input type="date" id="t_date" required /></label>
       <label>구분
         <select id="t_type">

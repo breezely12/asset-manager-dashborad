@@ -520,8 +520,9 @@ async function loadLedger() {
       <td>${t.category}</td>
       <td>${fmtKRW(t.amount)}</td>
       <td>${t.memo ?? ""}</td>
-      <td><button class="btn btn-small btn-danger del-btn">삭제</button></td>
+      <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
     `;
+    tr.querySelector(".edit-btn").addEventListener("click", () => openTxModal(t));
     tr.querySelector(".del-btn").addEventListener("click", async () => {
       if (confirm("삭제할까요?")) { await api(`/transactions/${t.id}`, { method: "DELETE" }); loadLedger(); loadOverview(); }
     });
@@ -532,14 +533,21 @@ async function loadLedger() {
 document.getElementById("ledgerMonth").addEventListener("change", loadLedger);
 
 const txModal = document.getElementById("txModal");
-document.getElementById("addTxBtn").addEventListener("click", () => {
-  document.getElementById("txForm").reset();
-  document.getElementById("t_date").value = new Date().toISOString().slice(0, 10);
+function openTxModal(t) {
+  document.getElementById("txModalTitle").textContent = t ? "내역 수정" : "내역 추가";
+  document.getElementById("t_id").value = t?.id ?? "";
+  document.getElementById("t_date").value = t?.date ?? new Date().toISOString().slice(0, 10);
+  document.getElementById("t_type").value = t?.type ?? "expense";
+  document.getElementById("t_category").value = t?.category ?? "";
+  document.getElementById("t_amount").value = t?.amount ?? "";
+  document.getElementById("t_memo").value = t?.memo ?? "";
   txModal.classList.remove("hidden");
-});
+}
+document.getElementById("addTxBtn").addEventListener("click", () => openTxModal(null));
 document.getElementById("txCancelBtn").addEventListener("click", () => txModal.classList.add("hidden"));
 document.getElementById("txForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const id = document.getElementById("t_id").value;
   const body = {
     date: document.getElementById("t_date").value,
     type: document.getElementById("t_type").value,
@@ -547,7 +555,8 @@ document.getElementById("txForm").addEventListener("submit", async (e) => {
     amount: parseFloat(document.getElementById("t_amount").value),
     memo: document.getElementById("t_memo").value || null,
   };
-  await api("/transactions", { method: "POST", body: JSON.stringify(body) });
+  if (id) await api(`/transactions/${id}`, { method: "PUT", body: JSON.stringify(body) });
+  else await api("/transactions", { method: "POST", body: JSON.stringify(body) });
   txModal.classList.add("hidden");
   loadLedger();
   loadOverview();
