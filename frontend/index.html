@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>자산 관리 대시보드</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="viz-root">
+  <header class="app-header">
+    <h1>자산 관리 대시보드</h1>
+    <div class="header-actions">
+      <span id="fxRate" class="muted"></span>
+      <button id="snapshotBtn" class="btn btn-secondary">오늘 스냅샷 저장</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="overview">전체 현황</button>
+    <button class="tab-btn" data-tab="holdings">자산 목록</button>
+    <button class="tab-btn" data-tab="ledger">가계부</button>
+  </nav>
+
+  <!-- OVERVIEW -->
+  <section id="tab-overview" class="tab-panel active">
+    <div class="stat-row">
+      <div class="stat-tile stat-tile-primary">
+        <div class="stat-label">순자산 (자산 - 부채)</div>
+        <div class="stat-value" id="netWorthValue">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">총 자산 (KRW)</div>
+        <div class="stat-value" id="totalValue">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">총 부채 (KRW)</div>
+        <div class="stat-value" id="totalLiabilities">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">총 매입 대비 손익</div>
+        <div class="stat-value" id="totalGain">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">이번 달 수입</div>
+        <div class="stat-value" id="monthIncome">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">이번 달 지출</div>
+        <div class="stat-value" id="monthExpense">-</div>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>자산 배분</h3>
+        <div class="chart-body">
+          <svg id="allocationChart" viewBox="0 0 240 240"></svg>
+          <ul id="allocationLegend" class="legend"></ul>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>자산 변화 추이</h3>
+        <div class="chart-body">
+          <svg id="historyChart" viewBox="0 0 480 220" preserveAspectRatio="none"></svg>
+          <div id="historyTooltip" class="tooltip hidden"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>인생 목표</h3>
+      <ul id="goalsList" class="goals-list"></ul>
+    </div>
+  </section>
+
+  <!-- HOLDINGS -->
+  <section id="tab-holdings" class="tab-panel">
+    <div class="panel-header">
+      <h2>자산 목록</h2>
+      <button id="addHoldingBtn" class="btn btn-primary">+ 자산 추가</button>
+    </div>
+    <table class="data-table" id="holdingsTable">
+      <thead>
+        <tr>
+          <th>구분</th><th>이름</th><th>수량</th><th>평균 매입가</th>
+          <th>현재가</th><th>평가금액(KRW)</th><th>손익</th><th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="panel-header" style="margin-top:28px;">
+      <h2>부채 목록</h2>
+      <button id="addLiabilityBtn" class="btn btn-primary">+ 부채 추가</button>
+    </div>
+    <table class="data-table" id="liabilitiesTable">
+      <thead>
+        <tr><th>이름</th><th>메모</th><th>잔액(KRW)</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- LEDGER -->
+  <section id="tab-ledger" class="tab-panel">
+    <div class="panel-header">
+      <h2>가계부</h2>
+      <div class="header-actions">
+        <input type="month" id="ledgerMonth" />
+        <button id="addTxBtn" class="btn btn-primary">+ 내역 추가</button>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>이번 달 수입/지출</h3>
+        <div class="chart-body">
+          <svg id="ledgerBarChart" viewBox="0 0 240 220"></svg>
+          <ul id="ledgerBarLegend" class="legend"></ul>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>지출 카테고리</h3>
+        <div class="chart-body">
+          <svg id="expenseChart" viewBox="0 0 240 240"></svg>
+          <ul id="expenseLegend" class="legend"></ul>
+        </div>
+      </div>
+    </div>
+
+    <table class="data-table" id="txTable">
+      <thead>
+        <tr><th>날짜</th><th>구분</th><th>카테고리</th><th>금액</th><th>메모</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+<!-- Holding modal -->
+<div id="holdingModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3 id="holdingModalTitle">자산 추가</h3>
+    <form id="holdingForm">
+      <input type="hidden" id="h_id" />
+      <label>구분
+        <select id="h_category">
+          <option value="stock">주식</option>
+          <option value="crypto">가상자산</option>
+          <option value="cash">현금/예금</option>
+          <option value="realestate">부동산</option>
+          <option value="other">기타</option>
+        </select>
+      </label>
+      <label>이름 <input type="text" id="h_name" required placeholder="예: 삼성전자" /></label>
+
+      <div id="h_symbolBlock">
+        <label>티커/심볼 <input type="text" id="h_symbol" placeholder="예: AAPL, 005930.KS" /></label>
+        <button type="button" id="h_lookupBtn" class="btn btn-secondary btn-small">가격 조회</button>
+        <div id="h_lookupResult" class="muted"></div>
+        <div id="h_cryptoResults"></div>
+      </div>
+
+      <div id="h_qtyBlock" class="field-row">
+        <label>수량 <input type="number" step="any" id="h_quantity" /></label>
+        <label>평균 매입가 <input type="number" step="any" id="h_avg_cost" /></label>
+      </div>
+
+      <div id="h_manualBlock" class="field-row hidden">
+        <label>현재 가치 <input type="number" step="any" id="h_manual_value" /></label>
+        <label>매입 당시 가치 (선택) <input type="number" step="any" id="h_avg_cost_manual" /></label>
+      </div>
+
+      <label>통화
+        <select id="h_currency">
+          <option value="KRW">KRW</option>
+          <option value="USD">USD</option>
+        </select>
+      </label>
+      <label>메모 <input type="text" id="h_note" /></label>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="holdingCancelBtn">취소</button>
+        <button type="submit" class="btn btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Transaction modal -->
+<div id="txModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3>내역 추가</h3>
+    <form id="txForm">
+      <label>날짜 <input type="date" id="t_date" required /></label>
+      <label>구분
+        <select id="t_type">
+          <option value="expense">지출</option>
+          <option value="income">수입</option>
+        </select>
+      </label>
+      <label>카테고리 <input type="text" id="t_category" required placeholder="예: 식비, 월급" /></label>
+      <label>금액 <input type="number" step="any" id="t_amount" required /></label>
+      <label>메모 <input type="text" id="t_memo" /></label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="txCancelBtn">취소</button>
+        <button type="submit" class="btn btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Liability modal -->
+<div id="liabilityModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3 id="liabilityModalTitle">부채 추가</h3>
+    <form id="liabilityForm">
+      <input type="hidden" id="l_id" />
+      <label>이름 <input type="text" id="l_name" required placeholder="예: KB 내집마련디딤돌대출" /></label>
+      <label>잔액(KRW) <input type="number" step="any" id="l_balance" required /></label>
+      <label>메모 <input type="text" id="l_note" /></label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="liabilityCancelBtn">취소</button>
+        <button type="submit" class="btn btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
