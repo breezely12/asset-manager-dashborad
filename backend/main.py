@@ -83,6 +83,7 @@ class TransactionIn(BaseModel):
     amount: float
     memo: Optional[str] = None
     kind: Literal["ledger", "investment"] = "ledger"
+    payment_method: Optional[str] = None
 
 
 class GoalIn(BaseModel):
@@ -317,8 +318,8 @@ def list_transactions(month: Optional[str] = None, kind: str = "ledger"):
 def create_transaction(body: TransactionIn):
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO transactions (date, type, category, amount, memo, kind) VALUES (?, ?, ?, ?, ?, ?)",
-            (body.date, body.type, body.category, body.amount, body.memo, body.kind),
+            "INSERT INTO transactions (date, type, category, amount, memo, kind, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (body.date, body.type, body.category, body.amount, body.memo, body.kind, body.payment_method),
         )
         return {"id": cur.lastrowid}
 
@@ -330,8 +331,8 @@ def update_transaction(tx_id: int, body: TransactionIn):
         if not existing:
             raise HTTPException(404, "Transaction not found")
         conn.execute(
-            "UPDATE transactions SET date=?, type=?, category=?, amount=?, memo=?, kind=? WHERE id=?",
-            (body.date, body.type, body.category, body.amount, body.memo, body.kind, tx_id),
+            "UPDATE transactions SET date=?, type=?, category=?, amount=?, memo=?, kind=?, payment_method=? WHERE id=?",
+            (body.date, body.type, body.category, body.amount, body.memo, body.kind, body.payment_method, tx_id),
         )
     return {"ok": True}
 

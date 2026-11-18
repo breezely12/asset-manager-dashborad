@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     amount REAL NOT NULL,
     memo TEXT,
     kind TEXT NOT NULL DEFAULT 'ledger' CHECK(kind IN ('ledger', 'investment')),
+    payment_method TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -79,6 +80,8 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE transactions ADD COLUMN kind TEXT NOT NULL DEFAULT 'ledger'"
             )
+        if "payment_method" not in tx_columns:
+            conn.execute("ALTER TABLE transactions ADD COLUMN payment_method TEXT")
         if conn.execute("SELECT COUNT(*) FROM goals").fetchone()[0] == 0:
             conn.executemany(
                 "INSERT INTO goals (age, target_krw, label) VALUES (?, ?, ?)", _DEFAULT_GOALS

@@ -8,6 +8,30 @@ const CATEGORY_COLOR_VAR = {
 };
 const CATEGORY_ORDER = ["stock", "crypto", "cash", "realestate", "other"];
 
+// household-ledger 대분류 -> 소분류, following the user's reference budget sheet
+const LEDGER_CATEGORY_TAXONOMY = {
+  "수입": ["남편월급", "남편상여", "아내월급", "아내상여", "부수입", "투자소득", "기타소득"],
+  "저축·투자": ["예적금", "주식계좌", "대출원금상환", "펀드/ETF", "달러/금", "가상화폐"],
+  "연금·노후": ["개인연금", "퇴직연금", "국민연금"],
+  "비상금": ["비상금통장1", "비상금통장2"],
+  "고정비": ["관리비", "도시가스", "대출이자"],
+  "식비": ["식자재", "외식", "카페류"],
+  "생활용품": ["생활소품", "가전/가구", "침구/인테리어", "수리/청소"],
+  "꾸밈비": ["의류/잡화", "미용/헤어", "세탁/수선", "꾸밈/의류"],
+  "건강": ["병원/약국", "건강보조", "예방/검진", "구독/멤버십"],
+  "자기계발": ["스터디/수강", "운동", "도서"],
+  "자동차": ["주유", "주차/통행료", "대중교통", "택시", "소모품/수리", "보험/세금"],
+  "자녀": ["육아용품", "놀이/활동", "교육/도서", "기관/돌봄"],
+  "반려동물": ["반려용품", "동물병원"],
+  "여행": ["국내여행", "해외여행"],
+  "문화생활": ["공연/전시", "OTT", "기타 입장료"],
+  "경조사": ["가족/친척", "지인/동료"],
+  "용돈": ["남편용돈", "아내용돈"],
+  "보험": ["남편종합", "남편실비", "아내종합", "아내실비", "자녀종합"],
+  "통신비": ["휴대폰", "인터넷/TV", "수리/Acc", "구독", "서비스"],
+  "기타": ["세금", "회비", "기타"],
+};
+
 const fmtKRW = (n) => n == null ? "-" : new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(n) + "원";
 const fmtSigned = (n) => n == null ? "-" : (n >= 0 ? "+" : "") + new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(n) + "원";
 const fmtPct = (n) => n == null ? "" : ` (${n >= 0 ? "+" : ""}${n.toFixed(1)}%)`;
@@ -518,6 +542,7 @@ async function loadLedger() {
       <td>${t.date}</td>
       <td>${t.type === "income" ? "수입" : "지출"}</td>
       <td>${t.category}</td>
+      <td>${t.payment_method ?? ""}</td>
       <td>${fmtKRW(t.amount)}</td>
       <td>${t.memo ?? ""}</td>
       <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
@@ -533,13 +558,46 @@ async function loadLedger() {
 document.getElementById("ledgerMonth").addEventListener("change", loadLedger);
 
 const txModal = document.getElementById("txModal");
+const majorSelect = document.getElementById("t_category_major");
+const minorSelect = document.getElementById("t_category_minor");
+
+majorSelect.innerHTML = Object.keys(LEDGER_CATEGORY_TAXONOMY)
+  .map((major) => `<option value="${major}">${major}</option>`).join("");
+
+function populateMinorOptions(major, selectedMinor) {
+  const minors = LEDGER_CATEGORY_TAXONOMY[major] || [];
+  minorSelect.innerHTML = minors.map((m) => `<option value="${m}">${m}</option>`).join("");
+  if (selectedMinor && minors.includes(selectedMinor)) minorSelect.value = selectedMinor;
+}
+majorSelect.addEventListener("change", () => populateMinorOptions(majorSelect.value));
+
 function openTxModal(t, kind) {
   document.getElementById("txModalTitle").textContent = t ? "내역 수정" : "내역 추가";
   document.getElementById("t_id").value = t?.id ?? "";
   document.getElementById("t_kind").value = t?.kind ?? kind ?? "ledger";
   document.getElementById("t_date").value = t?.date ?? new Date().toISOString().slice(0, 10);
   document.getElementById("t_type").value = t?.type ?? "expense";
-  document.getElementById("t_category").value = t?.category ?? "";
+
+  let major = Object.keys(LEDGER_CATEGORY_TAXONOMY)[0];
+  let minor = null;
+  if (t?.category && t.category.includes("-")) {
+    const idx = t.category.indexOf("-");
+    const candidateMajor = t.category.slice(0, idx);
+    if (LEDGER_CATEGORY_TAXONOMY[candidateMajor]) {
+      major = candidateMajor;
+      minor = t.category.slice(idx + 1);
+    }
+  } else if (t?.category && LEDGER_CATEGORY_TAXONOMY[t.category]) {
+    major = t.category;
+  }
+  majorSelect.value = major;
+  populateMinorOptions(major, minor);
+  if (t?.category && !minor && !LEDGER_CATEGORY_TAXONOMY[t.category]) {
+    // legacy free-text category that doesn't match the taxonomy: keep it visible via memo note
+    document.getElementById("t_memo").value = t?.memo ? t.memo : "";
+  }
+
+  document.getElementById("t_payment_method").value = t?.payment_method ?? "";
   document.getElementById("t_amount").value = t?.amount ?? "";
   document.getElementById("t_memo").value = t?.memo ?? "";
   txModal.classList.remove("hidden");
@@ -551,12 +609,14 @@ document.getElementById("txForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("t_id").value;
   const kind = document.getElementById("t_kind").value;
+  const category = `${majorSelect.value}-${minorSelect.value}`;
   const body = {
     date: document.getElementById("t_date").value,
     type: document.getElementById("t_type").value,
-    category: document.getElementById("t_category").value,
+    category,
     amount: parseFloat(document.getElementById("t_amount").value),
     memo: document.getElementById("t_memo").value || null,
+    payment_method: document.getElementById("t_payment_method").value || null,
     kind,
   };
   if (id) await api(`/transactions/${id}`, { method: "PUT", body: JSON.stringify(body) });
