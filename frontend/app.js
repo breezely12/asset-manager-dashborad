@@ -213,6 +213,55 @@ function renderBars(svgId, legendId, bars) {
   });
 }
 
+// ---------- grouped monthly bar chart (income vs expense across 12 months) ----------
+function renderMonthlyBars(svgId, legendId, months) {
+  const svg = document.getElementById(svgId);
+  const legend = document.getElementById(legendId);
+  svg.innerHTML = ""; legend.innerHTML = "";
+  const W = 480, H = 240, padB = 24, padT = 10, padL = 4, padR = 4;
+  const maxV = Math.max(...months.flatMap((m) => [m.income, m.expense]), 1);
+  const groupW = (W - padL - padR) / months.length;
+  const barW = Math.min(groupW / 2 - 4, 14);
+  const ns = "http://www.w3.org/2000/svg";
+
+  const baseline = document.createElementNS(ns, "line");
+  baseline.setAttribute("x1", padL); baseline.setAttribute("x2", W - padR);
+  baseline.setAttribute("y1", H - padB); baseline.setAttribute("y2", H - padB);
+  baseline.setAttribute("stroke", cssVar("--baseline"));
+  svg.appendChild(baseline);
+
+  months.forEach((m, i) => {
+    const groupX = padL + i * groupW;
+    const incH = (m.income / maxV) * (H - padT - padB);
+    const expH = (m.expense / maxV) * (H - padT - padB);
+
+    const incRect = document.createElementNS(ns, "rect");
+    incRect.setAttribute("x", groupX + groupW / 2 - barW - 1);
+    incRect.setAttribute("y", H - padB - incH);
+    incRect.setAttribute("width", barW); incRect.setAttribute("height", Math.max(incH, 0.5));
+    incRect.setAttribute("fill", cssVar("--series-1"));
+    svg.appendChild(incRect);
+
+    const expRect = document.createElementNS(ns, "rect");
+    expRect.setAttribute("x", groupX + groupW / 2 + 1);
+    expRect.setAttribute("y", H - padB - expH);
+    expRect.setAttribute("width", barW); expRect.setAttribute("height", Math.max(expH, 0.5));
+    expRect.setAttribute("fill", cssVar("--series-8"));
+    svg.appendChild(expRect);
+
+    const label = document.createElementNS(ns, "text");
+    label.setAttribute("x", groupX + groupW / 2); label.setAttribute("y", H - 8);
+    label.setAttribute("text-anchor", "middle"); label.setAttribute("font-size", "10");
+    label.setAttribute("fill", cssVar("--text-secondary"));
+    label.textContent = m.month.slice(5);
+    svg.appendChild(label);
+  });
+
+  legend.innerHTML =
+    `<li><span class="swatch" style="background:${cssVar("--series-1")}"></span><span>수입</span></li>` +
+    `<li><span class="swatch" style="background:${cssVar("--series-8")}"></span><span>지출</span></li>`;
+}
+
 // ---------- goals ----------
 function renderGoalsList(goalsData) {
   const list = document.getElementById("goalsList");
@@ -497,6 +546,38 @@ document.getElementById("txForm").addEventListener("submit", async (e) => {
   loadOverview();
 });
 
+// ---------- yearly report ----------
+async function loadYearlyYears() {
+  const years = await api("/transactions/years");
+  const select = document.getElementById("yearlySelect");
+  const currentYear = String(new Date().getFullYear());
+  const options = years.includes(currentYear) ? years : [currentYear, ...years];
+  select.innerHTML = options.map((y) => `<option value="${y}">${y}년</option>`).join("");
+  select.value = currentYear;
+}
+
+async function loadYearly() {
+  const year = document.getElementById("yearlySelect").value;
+  const data = await api(`/transactions/yearly?year=${year}`);
+
+  document.getElementById("yearlyIncome").textContent = fmtKRW(data.total_income);
+  document.getElementById("yearlyExpense").textContent = fmtKRW(data.total_expense);
+  const netEl = document.getElementById("yearlyNet");
+  netEl.textContent = fmtSigned(data.net);
+  netEl.className = "stat-value " + (data.net >= 0 ? "good" : "critical");
+
+  renderMonthlyBars("yearlyMonthlyChart", "yearlyMonthlyLegend", data.months);
+
+  const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-8"];
+  const categories = Object.entries(data.by_category).sort((a, b) => b[1] - a[1]);
+  renderDonut("yearlyCategoryChart", "yearlyCategoryLegend",
+    categories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] }))
+  );
+}
+
+document.getElementById("yearlySelect").addEventListener("change", loadYearly);
+document.querySelector('.tab-btn[data-tab="yearly"]').addEventListener("click", loadYearly);
+
 // ---------- snapshot ----------
 document.getElementById("snapshotBtn").addEventListener("click", async () => {
   await api("/snapshot", { method: "POST" });
@@ -509,3 +590,4 @@ loadOverview();
 loadHoldings();
 loadLiabilities();
 loadLedger();
+loadYearlyYears().then(loadYearly);

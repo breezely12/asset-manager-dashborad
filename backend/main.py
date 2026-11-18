@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import json
+import os
+import secrets
 from datetime import date
 from pathlib import Path
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from . import prices
 from .db import get_conn, init_db
@@ -17,6 +23,37 @@ app = FastAPI(title="Asset Manager")
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
+
+_basic = HTTPBasic(auto_error=False)
+
+
+class _BasicAuthMiddleware(BaseHTTPMiddleware):
+    """Gates every request behind HTTP Basic Auth, credentials from env vars.
+
+    Set with no defaults: if DASHBOARD_USER/DASHBOARD_PASS aren't set, auth
+    is skipped entirely (local-only use), so this only takes effect once the
+    server is started with those env vars exported.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        user = os.environ.get("DASHBOARD_USER")
+        password = os.environ.get("DASHBOARD_PASS")
+        if not user or not password:
+            return await call_next(request)
+
+        creds = await _basic(request)
+        if creds is None or not (
+            secrets.compare_digest(creds.username, user)
+            and secrets.compare_digest(creds.password, password)
+        ):
+            return Response(
+                status_code=401,
+                headers={"WWW-Authenticate": "Basic realm=\"asset-manager\""},
+            )
+        return await call_next(request)
+
+
+app.add_middleware(_BasicAuthMiddleware)
 
 CATEGORIES = ("stock", "crypto", "cash", "realestate", "other")
 
@@ -322,6 +359,50 @@ def transactions_summary(month: str):
         if r["type"] == "expense":
             by_category[r["category"]] = by_category.get(r["category"], 0.0) + r["amount"]
     return {"income": income, "expense": expense, "net": income - expense, "by_category": by_category}
+
+
+@app.get("/api/transactions/years")
+def transaction_years():
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT substr(date, 1, 4) AS year FROM transactions ORDER BY year DESC"
+        ).fetchall()
+    return [r["year"] for r in rows]
+
+
+@app.get("/api/transactions/yearly")
+def transactions_yearly(year: str):
+    with get_conn() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT date, type, category, amount FROM transactions WHERE date LIKE ?",
+                (f"{year}-%",),
+            )
+        ]
+    months = []
+    for m in range(1, 13):
+        month_key = f"{year}-{m:02d}"
+        month_rows = [r for r in rows if r["date"].startswith(month_key)]
+        income = sum(r["amount"] for r in month_rows if r["type"] == "income")
+        expense = sum(r["amount"] for r in month_rows if r["type"] == "expense")
+        months.append({"month": month_key, "income": income, "expense": expense})
+
+    by_category: dict[str, float] = {}
+    for r in rows:
+        if r["type"] == "expense":
+            by_category[r["category"]] = by_category.get(r["category"], 0.0) + r["amount"]
+
+    total_income = sum(mo["income"] for mo in months)
+    total_expense = sum(mo["expense"] for mo in months)
+    return {
+        "year": year,
+        "months": months,
+        "by_category": by_category,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "net": total_income - total_expense,
+    }
 
 
 # ---------- goals & settings ----------

@@ -20,6 +20,7 @@
     <button class="tab-btn active" data-tab="overview">전체 현황</button>
     <button class="tab-btn" data-tab="holdings">자산 목록</button>
     <button class="tab-btn" data-tab="ledger">가계부</button>
+    <button class="tab-btn" data-tab="yearly">연간 리포트</button>
   </nav>
 
   <!-- OVERVIEW -->
@@ -137,6 +138,48 @@
     </table>
   </section>
 
+  <!-- YEARLY -->
+  <section id="tab-yearly" class="tab-panel">
+    <div class="panel-header">
+      <h2>연간 리포트</h2>
+      <div class="header-actions">
+        <select id="yearlySelect"></select>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-tile">
+        <div class="stat-label">연간 총수입</div>
+        <div class="stat-value" id="yearlyIncome">-</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">연간 총지출</div>
+        <div class="stat-value" id="yearlyExpense">-</div>
+      </div>
+      <div class="stat-tile stat-tile-primary">
+        <div class="stat-label">연간 순수입</div>
+        <div class="stat-value" id="yearlyNet">-</div>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>월별 수입/지출</h3>
+        <div class="chart-body">
+          <svg id="yearlyMonthlyChart" viewBox="0 0 480 240" preserveAspectRatio="none"></svg>
+          <ul id="yearlyMonthlyLegend" class="legend"></ul>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>연간 지출 카테고리</h3>
+        <div class="chart-body">
+          <svg id="yearlyCategoryChart" viewBox="0 0 240 240"></svg>
+          <ul id="yearlyCategoryLegend" class="legend"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
 <!-- Holding modal -->
 <div id="holdingModal" class="modal-backdrop hidden">
   <div class="modal">
@@ -199,7 +242,33 @@
           <option value="income">수입</option>
         </select>
       </label>
-      <label>카테고리 <input type="text" id="t_category" required placeholder="예: 식비, 월급" /></label>
+      <label>카테고리
+        <input type="text" id="t_category" required placeholder="예: 식비-외식" list="categoryOptions" />
+        <datalist id="categoryOptions">
+          <option value="식비-외식"></option>
+          <option value="식비-마트/장보기"></option>
+          <option value="카페/간식"></option>
+          <option value="배달음식"></option>
+          <option value="생활용품"></option>
+          <option value="의류/패션"></option>
+          <option value="온라인쇼핑"></option>
+          <option value="교통"></option>
+          <option value="주거/관리비"></option>
+          <option value="통신"></option>
+          <option value="의료"></option>
+          <option value="교육"></option>
+          <option value="보험"></option>
+          <option value="여가/문화"></option>
+          <option value="반려동물"></option>
+          <option value="경조사"></option>
+          <option value="기부"></option>
+          <option value="저축투자"></option>
+          <option value="월급"></option>
+          <option value="부수입"></option>
+          <option value="용돈"></option>
+          <option value="기타"></option>
+        </datalist>
+      </label>
       <label>금액 <input type="number" step="any" id="t_amount" required /></label>
       <label>메모 <input type="text" id="t_memo" /></label>
       <div class="modal-actions">
