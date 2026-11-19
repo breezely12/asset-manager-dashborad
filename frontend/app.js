@@ -555,18 +555,28 @@ async function loadLedger() {
       <td>${t.payment_method ?? ""}</td>
       <td>${fmtKRW(t.amount)}</td>
       <td>${t.memo ?? ""}</td>
-      <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
+      <td>
+        <button class="btn btn-small edit-btn">수정</button>
+        <button class="btn btn-small move-btn">투자로</button>
+        <button class="btn btn-small btn-danger del-btn">삭제</button>
+      </td>
     `;
     const majorCell = tr.querySelector(".category-major-cell");
     const minorCell = tr.querySelector(".category-minor-cell");
     majorCell.addEventListener("click", () => openMajorPicker(majorCell, minorCell, t, loadLedger));
     minorCell.addEventListener("click", () => openMinorPicker(minorCell, t, loadLedger));
     tr.querySelector(".edit-btn").addEventListener("click", () => openTxModal(t));
+    tr.querySelector(".move-btn").addEventListener("click", () => moveTransactionKind(t, "investment"));
     tr.querySelector(".del-btn").addEventListener("click", async () => {
       if (confirm("삭제할까요?")) { await api(`/transactions/${t.id}`, { method: "DELETE" }); loadLedger(); loadOverview(); }
     });
     tbody.appendChild(tr);
   });
+}
+
+async function moveTransactionKind(t, newKind) {
+  await api(`/transactions/${t.id}`, { method: "PUT", body: JSON.stringify({ ...t, kind: newKind }) });
+  await Promise.all([loadLedger(), loadInvestments(), loadOverview()]);
 }
 
 // ---------- inline category pickers (대분류/소분류 as separate columns) ----------
@@ -752,9 +762,14 @@ async function loadInvestments() {
       <td>${t.category}${excludedTag}</td>
       <td>${fmtKRW(t.amount)}</td>
       <td>${t.memo ?? ""}</td>
-      <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
+      <td>
+        <button class="btn btn-small edit-btn">수정</button>
+        <button class="btn btn-small move-btn">가계부로</button>
+        <button class="btn btn-small btn-danger del-btn">삭제</button>
+      </td>
     `;
     tr.querySelector(".edit-btn").addEventListener("click", () => openTxModal(t, "investment"));
+    tr.querySelector(".move-btn").addEventListener("click", () => moveTransactionKind(t, "ledger"));
     tr.querySelector(".del-btn").addEventListener("click", async () => {
       if (confirm("삭제할까요?")) { await api(`/transactions/${t.id}`, { method: "DELETE" }); loadInvestments(); }
     });
