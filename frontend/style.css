@@ -284,8 +284,8 @@ input[type="month"], input[type="date"] {
   .chart-body svg { max-width: 100%; }
 }
 
-.category-cell { cursor: pointer; }
-.category-cell:hover { text-decoration: underline dotted; text-underline-offset: 3px; }
+.category-major-cell, .category-minor-cell { cursor: pointer; }
+.category-major-cell:hover, .category-minor-cell:hover { text-decoration: underline dotted; text-underline-offset: 3px; }
 .category-picker {
   display: flex;
   flex-direction: column;

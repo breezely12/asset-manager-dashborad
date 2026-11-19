@@ -32,6 +32,11 @@ const LEDGER_CATEGORY_TAXONOMY = {
   "기타": ["세금", "회비", "기타"],
 };
 
+function splitCategory(full) {
+  const idx = (full || "").indexOf("-");
+  return idx === -1 ? [full || "", ""] : [full.slice(0, idx), full.slice(idx + 1)];
+}
+
 const fmtKRW = (n) => n == null ? "-" : new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(n) + "원";
 const fmtSigned = (n) => n == null ? "-" : (n >= 0 ? "+" : "") + new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(n) + "원";
 const fmtPct = (n) => n == null ? "" : ` (${n >= 0 ? "+" : ""}${n.toFixed(1)}%)`;
@@ -540,17 +545,21 @@ async function loadLedger() {
     const tr = document.createElement("tr");
     if (!t.count_in_total) tr.className = "muted";
     const excludedTag = t.count_in_total ? "" : ' <span class="muted">(합계 제외)</span>';
+    const [major, minor] = splitCategory(t.category);
     tr.innerHTML = `
       <td>${t.date}</td>
       <td>${t.type === "income" ? "수입" : "지출"}</td>
-      <td class="category-cell">${t.category}${excludedTag}</td>
+      <td class="category-major-cell">${major}</td>
+      <td class="category-minor-cell">${minor}${excludedTag}</td>
       <td>${t.payment_method ?? ""}</td>
       <td>${fmtKRW(t.amount)}</td>
       <td>${t.memo ?? ""}</td>
       <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
     `;
-    const categoryCell = tr.querySelector(".category-cell");
-    categoryCell.addEventListener("click", () => openCategoryPicker(categoryCell, t, loadLedger));
+    const majorCell = tr.querySelector(".category-major-cell");
+    const minorCell = tr.querySelector(".category-minor-cell");
+    majorCell.addEventListener("click", () => openMajorPicker(majorCell, minorCell, t, loadLedger));
+    minorCell.addEventListener("click", () => openMinorPicker(minorCell, t, loadLedger));
     tr.querySelector(".edit-btn").addEventListener("click", () => openTxModal(t));
     tr.querySelector(".del-btn").addEventListener("click", async () => {
       if (confirm("삭제할까요?")) { await api(`/transactions/${t.id}`, { method: "DELETE" }); loadLedger(); loadOverview(); }
@@ -559,65 +568,63 @@ async function loadLedger() {
   });
 }
 
-// ---------- inline category picker (click a category cell to change it) ----------
-function openCategoryPicker(cell, t, onSaved) {
-  const originalHTML = cell.innerHTML;
-  let currentMajor = Object.keys(LEDGER_CATEGORY_TAXONOMY)[0];
-  let currentMinor = null;
-  if (t.category && t.category.includes("-")) {
-    const idx = t.category.indexOf("-");
-    const candidateMajor = t.category.slice(0, idx);
-    if (LEDGER_CATEGORY_TAXONOMY[candidateMajor]) {
-      currentMajor = candidateMajor;
-      currentMinor = t.category.slice(idx + 1);
-    }
-  } else if (t.category && LEDGER_CATEGORY_TAXONOMY[t.category]) {
-    currentMajor = t.category;
-  }
-
-  function populateMinor(minorSelectEl, major, selectedMinor) {
-    const minors = LEDGER_CATEGORY_TAXONOMY[major] || [];
-    minorSelectEl.innerHTML = minors.map((m) => `<option value="${m}">${m}</option>`).join("");
-    if (selectedMinor && minors.includes(selectedMinor)) minorSelectEl.value = selectedMinor;
-  }
-
-  function render() {
-    const majorOptions = Object.keys(LEDGER_CATEGORY_TAXONOMY)
-      .map((major) => `<option value="${major}" ${major === currentMajor ? "selected" : ""}>${major}</option>`)
-      .join("");
-    cell.innerHTML = `
-      <div class="category-picker category-picker-dropdown">
-        <select class="category-major-select">${majorOptions}</select>
-        <select class="category-minor-select"></select>
-        <button type="button" class="category-picker-close">✕</button>
-      </div>
-    `;
-    const majorSelectEl = cell.querySelector(".category-major-select");
-    const minorSelectEl = cell.querySelector(".category-minor-select");
-    populateMinor(minorSelectEl, currentMajor, currentMinor);
-
-    majorSelectEl.addEventListener("click", (e) => e.stopPropagation());
-    minorSelectEl.addEventListener("click", (e) => e.stopPropagation());
-    majorSelectEl.addEventListener("change", () => {
-      currentMajor = majorSelectEl.value;
-      currentMinor = null;
-      populateMinor(minorSelectEl, currentMajor, currentMinor);
+// ---------- inline category pickers (대분류/소분류 as separate columns) ----------
+function openMajorPicker(majorCell, minorCell, t, onSaved) {
+  const originalMajorHTML = majorCell.innerHTML;
+  const [currentMajor, currentMinor] = splitCategory(t.category);
+  const options = Object.keys(LEDGER_CATEGORY_TAXONOMY)
+    .map((major) => `<option value="${major}" ${major === currentMajor ? "selected" : ""}>${major}</option>`)
+    .join("");
+  majorCell.innerHTML = `
+    <div class="category-picker category-picker-dropdown">
+      <select class="category-major-select">${options}</select>
+      <button type="button" class="category-picker-close">✕</button>
+    </div>
+  `;
+  const selectEl = majorCell.querySelector(".category-major-select");
+  selectEl.addEventListener("click", (e) => e.stopPropagation());
+  selectEl.addEventListener("change", async () => {
+    const newMajor = selectEl.value;
+    const minors = LEDGER_CATEGORY_TAXONOMY[newMajor] || [];
+    const newMinor = minors.includes(currentMinor) ? currentMinor : (minors[0] || "");
+    await api(`/transactions/${t.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ ...t, category: `${newMajor}-${newMinor}` }),
     });
-    minorSelectEl.addEventListener("change", async () => {
-      const newCategory = `${currentMajor}-${minorSelectEl.value}`;
-      await api(`/transactions/${t.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ ...t, category: newCategory }),
-      });
-      onSaved();
+    onSaved();
+  });
+  majorCell.querySelector(".category-picker-close").addEventListener("click", (e) => {
+    e.stopPropagation();
+    majorCell.innerHTML = originalMajorHTML;
+    majorCell.addEventListener("click", () => openMajorPicker(majorCell, minorCell, t, onSaved));
+  });
+}
+
+function openMinorPicker(minorCell, t, onSaved) {
+  const originalMinorHTML = minorCell.innerHTML;
+  const [currentMajor, currentMinor] = splitCategory(t.category);
+  const minors = LEDGER_CATEGORY_TAXONOMY[currentMajor] || [];
+  const options = minors.map((m) => `<option value="${m}" ${m === currentMinor ? "selected" : ""}>${m}</option>`).join("");
+  minorCell.innerHTML = `
+    <div class="category-picker category-picker-dropdown">
+      <select class="category-minor-select">${options}</select>
+      <button type="button" class="category-picker-close">✕</button>
+    </div>
+  `;
+  const selectEl = minorCell.querySelector(".category-minor-select");
+  selectEl.addEventListener("click", (e) => e.stopPropagation());
+  selectEl.addEventListener("change", async () => {
+    await api(`/transactions/${t.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ ...t, category: `${currentMajor}-${selectEl.value}` }),
     });
-    cell.querySelector(".category-picker-close").addEventListener("click", (e) => {
-      e.stopPropagation();
-      cell.innerHTML = originalHTML;
-      cell.addEventListener("click", () => openCategoryPicker(cell, t, onSaved));
-    });
-  }
-  render();
+    onSaved();
+  });
+  minorCell.querySelector(".category-picker-close").addEventListener("click", (e) => {
+    e.stopPropagation();
+    minorCell.innerHTML = originalMinorHTML;
+    minorCell.addEventListener("click", () => openMinorPicker(minorCell, t, onSaved));
+  });
 }
 
 document.getElementById("ledgerMonth").addEventListener("change", loadLedger);
@@ -764,11 +771,6 @@ async function loadYearly() {
   netEl.className = "stat-value " + (data.net >= 0 ? "good" : "critical");
 
   renderMonthlyBars("yearlyMonthlyChart", "yearlyMonthlyLegend", data.months);
-
-  const splitCategory = (full) => {
-    const idx = full.indexOf("-");
-    return idx === -1 ? [full, ""] : [full.slice(0, idx), full.slice(idx + 1)];
-  };
 
   const majorTotals = {};
   const subRows = [];
