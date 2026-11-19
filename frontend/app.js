@@ -569,22 +569,39 @@ async function loadLedger() {
 }
 
 // ---------- inline category pickers (대분류/소분류 as separate columns) ----------
+function closeCategoryPopover(cell) {
+  const popover = cell.querySelector(".category-picker-float");
+  if (popover) popover.remove();
+  cell.classList.remove("is-editing");
+}
+
+function attachOutsideClose(cell, popover) {
+  const handler = (e) => {
+    if (!popover.contains(e.target)) {
+      closeCategoryPopover(cell);
+      document.removeEventListener("click", handler, true);
+    }
+  };
+  setTimeout(() => document.addEventListener("click", handler, true), 0);
+}
+
 function openMajorPicker(majorCell, minorCell, t, onSaved) {
-  const originalMajorHTML = majorCell.innerHTML;
+  if (majorCell.querySelector(".category-picker-float")) return;
   const [currentMajor, currentMinor] = splitCategory(t.category);
   const options = Object.keys(LEDGER_CATEGORY_TAXONOMY)
     .map((major) => `<option value="${major}" ${major === currentMajor ? "selected" : ""}>${major}</option>`)
     .join("");
-  majorCell.innerHTML = `
-    <div class="category-picker category-picker-dropdown">
-      <select class="category-major-select">${options}</select>
-      <button type="button" class="category-picker-close">✕</button>
-    </div>
+  const popover = document.createElement("div");
+  popover.className = "category-picker-float";
+  popover.innerHTML = `
+    <select class="category-major-select">${options}</select>
+    <button type="button" class="category-picker-close">✕</button>
   `;
-  const selectEl = majorCell.querySelector(".category-major-select");
-  selectEl.addEventListener("click", (e) => e.stopPropagation());
-  selectEl.addEventListener("change", async () => {
-    const newMajor = selectEl.value;
+  majorCell.classList.add("is-editing");
+  majorCell.appendChild(popover);
+  popover.addEventListener("click", (e) => e.stopPropagation());
+  popover.querySelector("select").addEventListener("change", async (e) => {
+    const newMajor = e.target.value;
     const minors = LEDGER_CATEGORY_TAXONOMY[newMajor] || [];
     const newMinor = minors.includes(currentMinor) ? currentMinor : (minors[0] || "");
     await api(`/transactions/${t.id}`, {
@@ -593,38 +610,33 @@ function openMajorPicker(majorCell, minorCell, t, onSaved) {
     });
     onSaved();
   });
-  majorCell.querySelector(".category-picker-close").addEventListener("click", (e) => {
-    e.stopPropagation();
-    majorCell.innerHTML = originalMajorHTML;
-    majorCell.addEventListener("click", () => openMajorPicker(majorCell, minorCell, t, onSaved));
-  });
+  popover.querySelector(".category-picker-close").addEventListener("click", () => closeCategoryPopover(majorCell));
+  attachOutsideClose(majorCell, popover);
 }
 
 function openMinorPicker(minorCell, t, onSaved) {
-  const originalMinorHTML = minorCell.innerHTML;
+  if (minorCell.querySelector(".category-picker-float")) return;
   const [currentMajor, currentMinor] = splitCategory(t.category);
   const minors = LEDGER_CATEGORY_TAXONOMY[currentMajor] || [];
   const options = minors.map((m) => `<option value="${m}" ${m === currentMinor ? "selected" : ""}>${m}</option>`).join("");
-  minorCell.innerHTML = `
-    <div class="category-picker category-picker-dropdown">
-      <select class="category-minor-select">${options}</select>
-      <button type="button" class="category-picker-close">✕</button>
-    </div>
+  const popover = document.createElement("div");
+  popover.className = "category-picker-float";
+  popover.innerHTML = `
+    <select class="category-minor-select">${options}</select>
+    <button type="button" class="category-picker-close">✕</button>
   `;
-  const selectEl = minorCell.querySelector(".category-minor-select");
-  selectEl.addEventListener("click", (e) => e.stopPropagation());
-  selectEl.addEventListener("change", async () => {
+  minorCell.classList.add("is-editing");
+  minorCell.appendChild(popover);
+  popover.addEventListener("click", (e) => e.stopPropagation());
+  popover.querySelector("select").addEventListener("change", async (e) => {
     await api(`/transactions/${t.id}`, {
       method: "PUT",
-      body: JSON.stringify({ ...t, category: `${currentMajor}-${selectEl.value}` }),
+      body: JSON.stringify({ ...t, category: `${currentMajor}-${e.target.value}` }),
     });
     onSaved();
   });
-  minorCell.querySelector(".category-picker-close").addEventListener("click", (e) => {
-    e.stopPropagation();
-    minorCell.innerHTML = originalMinorHTML;
-    minorCell.addEventListener("click", () => openMinorPicker(minorCell, t, onSaved));
-  });
+  popover.querySelector(".category-picker-close").addEventListener("click", () => closeCategoryPopover(minorCell));
+  attachOutsideClose(minorCell, popover);
 }
 
 document.getElementById("ledgerMonth").addEventListener("change", loadLedger);
