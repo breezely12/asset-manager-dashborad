@@ -648,10 +648,12 @@ async function loadInvestments() {
   tbody.innerHTML = "";
   items.forEach((t) => {
     const tr = document.createElement("tr");
+    if (!t.count_in_total) tr.className = "muted";
+    const excludedTag = t.count_in_total ? "" : ' <span class="muted">(합계 제외)</span>';
     tr.innerHTML = `
       <td>${t.date}</td>
       <td>${t.type === "income" ? "입금" : "출금"}</td>
-      <td>${t.category}</td>
+      <td>${t.category}${excludedTag}</td>
       <td>${fmtKRW(t.amount)}</td>
       <td>${t.memo ?? ""}</td>
       <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>

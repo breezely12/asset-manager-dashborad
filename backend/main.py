@@ -431,7 +431,7 @@ def investments_summary():
         rows = [
             dict(r)
             for r in conn.execute(
-                "SELECT type, category, amount FROM transactions WHERE kind = 'investment'"
+                "SELECT type, category, amount FROM transactions WHERE kind = 'investment' AND count_in_total = 1"
             )
         ]
     income = sum(r["amount"] for r in rows if r["type"] == "income")
