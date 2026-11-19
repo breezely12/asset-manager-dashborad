@@ -63,7 +63,8 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 });
 
 // ---------- donut chart ----------
-function renderDonut(svgId, legendId, segments) {
+function renderDonut(svgId, legendId, segments, options = {}) {
+  const minPct = options.minPct || 0;
   // segments: [{label, value, colorVar}]
   const svg = document.getElementById(svgId);
   const legend = document.getElementById(legendId);
@@ -104,10 +105,12 @@ function renderDonut(svgId, legendId, segments) {
     circle.setAttribute("stroke-dashoffset", 0);
     svg.appendChild(circle);
 
-    const li = document.createElement("li");
-    li.innerHTML = `<span class="swatch" style="background:${cssVar(seg.colorVar)}"></span>` +
-      `<span>${seg.label}</span><span class="legend-value">${(fraction * 100).toFixed(1)}%</span>`;
-    legend.appendChild(li);
+    if (fraction * 100 >= minPct) {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="swatch" style="background:${cssVar(seg.colorVar)}"></span>` +
+        `<span>${seg.label}</span><span class="legend-value">${(fraction * 100).toFixed(1)}%</span>`;
+      legend.appendChild(li);
+    }
 
     cumulativeDeg += segDeg;
   });
@@ -537,7 +540,8 @@ async function loadLedger() {
   const categories = Object.entries(txSummary.by_category).sort((a, b) => b[1] - a[1]);
   const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-6", "--series-7", "--series-8"];
   renderDonut("expenseChart", "expenseLegend",
-    categories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] }))
+    categories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] })),
+    { minPct: 2 }
   );
 
   const fillCategoryBox = (tbodyId, byCategory, base) => {
