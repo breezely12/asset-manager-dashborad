@@ -284,6 +284,42 @@ input[type="month"], input[type="date"] {
 }
 .filter-bar select:hover { border-color: var(--series-1); }
 
+.category-box-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.category-box {
+  border-radius: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+}
+.category-box h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.category-box .data-table {
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+.category-box-income {
+  background: color-mix(in srgb, var(--series-1) 7%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--series-1) 25%, var(--border));
+}
+.category-box-income h4 { color: var(--series-1); }
+.category-box-expense {
+  background: color-mix(in srgb, var(--series-8) 7%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--series-8) 25%, var(--border));
+}
+.category-box-expense h4 { color: var(--series-8); }
+
+@media (max-width: 860px) {
+  .category-box-grid { grid-template-columns: 1fr; }
+}
+
 .data-table th.sortable {
   cursor: pointer;
   user-select: none;

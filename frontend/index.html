@@ -137,12 +137,26 @@
     <div class="panel-header">
       <h3>이번 달 카테고리별 합산</h3>
     </div>
-    <table class="data-table" id="txCategoryTable">
-      <thead>
-        <tr><th>구분</th><th>대분류</th><th>소분류</th><th>금액</th><th>비중</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="category-box-grid">
+      <div class="category-box category-box-income">
+        <h4>수입</h4>
+        <table class="data-table" id="txCategoryIncomeTable">
+          <thead>
+            <tr><th>대분류</th><th>소분류</th><th>금액</th><th>비중</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="category-box category-box-expense">
+        <h4>지출</h4>
+        <table class="data-table" id="txCategoryExpenseTable">
+          <thead>
+            <tr><th>대분류</th><th>소분류</th><th>금액</th><th>비중</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
 
     <div class="filter-bar" id="txFilterBar">
       <select id="txFilterType">
