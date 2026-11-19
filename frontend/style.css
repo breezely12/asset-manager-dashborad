@@ -16,14 +16,14 @@
   --good: #0ca30c;
   --critical: #d03b3b;
 
-  --series-1: #4f46e5; /* indigo */
-  --series-2: #c2622d; /* terracotta */
-  --series-3: #0f8a72; /* teal */
-  --series-4: #b8860b; /* gold */
-  --series-5: #be5a7a; /* rose */
-  --series-6: #15803d; /* forest */
-  --series-7: #7c3aed; /* violet */
-  --series-8: #b91c1c; /* brick red */
+  --series-1: #2f5c99; /* denim blue */
+  --series-2: #b5502b; /* rust */
+  --series-3: #129788; /* teal */
+  --series-4: #c2881a; /* mustard gold */
+  --series-5: #a3476e; /* mauve */
+  --series-6: #5c7a2e; /* olive */
+  --series-7: #6a4486; /* plum violet */
+  --series-8: #a83226; /* brick red */
 
   --accent: #e07628; /* orange accent for the yearly report */
   --accent-soft: #f3a567;
@@ -44,14 +44,14 @@
     --good: #0ca30c;
     --critical: #e66767;
 
-    --series-1: #6366f1;
-    --series-2: #c2622d;
-    --series-3: #0f8a72;
-    --series-4: #b8860b;
-    --series-5: #be5a7a;
-    --series-6: #22a555;
-    --series-7: #9d5cf0;
-    --series-8: #e35050;
+    --series-1: #4d7ec2;
+    --series-2: #c56a3d;
+    --series-3: #1aa495;
+    --series-4: #b9850f;
+    --series-5: #c06793;
+    --series-6: #7d9c4a;
+    --series-7: #8a63a8;
+    --series-8: #d4523f;
 
     --accent: #f0924f;
     --accent-soft: #c9712f;
