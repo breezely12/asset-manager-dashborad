@@ -322,3 +322,21 @@ input[type="month"], input[type="date"] {
   border: none;
   padding: 0;
 }
+.category-picker-dropdown {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.category-picker-dropdown select {
+  font-size: 12.5px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+.category-picker-dropdown .category-picker-close {
+  align-self: auto;
+  font-size: 13px;
+}

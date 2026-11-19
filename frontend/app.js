@@ -575,39 +575,41 @@ function openCategoryPicker(cell, t, onSaved) {
     currentMajor = t.category;
   }
 
+  function populateMinor(minorSelectEl, major, selectedMinor) {
+    const minors = LEDGER_CATEGORY_TAXONOMY[major] || [];
+    minorSelectEl.innerHTML = minors.map((m) => `<option value="${m}">${m}</option>`).join("");
+    if (selectedMinor && minors.includes(selectedMinor)) minorSelectEl.value = selectedMinor;
+  }
+
   function render() {
-    const majorTabs = Object.keys(LEDGER_CATEGORY_TAXONOMY).map((major) =>
-      `<button type="button" class="category-tab ${major === currentMajor ? "active" : ""}" data-major="${major}">${major}</button>`
-    ).join("");
-    const minors = LEDGER_CATEGORY_TAXONOMY[currentMajor] || [];
-    const minorTabs = minors.map((minor) =>
-      `<button type="button" class="category-tab ${minor === currentMinor ? "active" : ""}" data-minor="${minor}">${minor}</button>`
-    ).join("");
+    const majorOptions = Object.keys(LEDGER_CATEGORY_TAXONOMY)
+      .map((major) => `<option value="${major}" ${major === currentMajor ? "selected" : ""}>${major}</option>`)
+      .join("");
     cell.innerHTML = `
-      <div class="category-picker">
-        <button type="button" class="category-picker-close">닫기 ✕</button>
-        <div class="category-tabs">${majorTabs}</div>
-        <div class="category-tabs">${minorTabs}</div>
+      <div class="category-picker category-picker-dropdown">
+        <select class="category-major-select">${majorOptions}</select>
+        <select class="category-minor-select"></select>
+        <button type="button" class="category-picker-close">✕</button>
       </div>
     `;
-    cell.querySelectorAll("[data-major]").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        currentMajor = btn.dataset.major;
-        currentMinor = null;
-        render();
-      });
+    const majorSelectEl = cell.querySelector(".category-major-select");
+    const minorSelectEl = cell.querySelector(".category-minor-select");
+    populateMinor(minorSelectEl, currentMajor, currentMinor);
+
+    majorSelectEl.addEventListener("click", (e) => e.stopPropagation());
+    minorSelectEl.addEventListener("click", (e) => e.stopPropagation());
+    majorSelectEl.addEventListener("change", () => {
+      currentMajor = majorSelectEl.value;
+      currentMinor = null;
+      populateMinor(minorSelectEl, currentMajor, currentMinor);
     });
-    cell.querySelectorAll("[data-minor]").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const newCategory = `${currentMajor}-${btn.dataset.minor}`;
-        await api(`/transactions/${t.id}`, {
-          method: "PUT",
-          body: JSON.stringify({ ...t, category: newCategory }),
-        });
-        onSaved();
+    minorSelectEl.addEventListener("change", async () => {
+      const newCategory = `${currentMajor}-${minorSelectEl.value}`;
+      await api(`/transactions/${t.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ ...t, category: newCategory }),
       });
+      onSaved();
     });
     cell.querySelector(".category-picker-close").addEventListener("click", (e) => {
       e.stopPropagation();
