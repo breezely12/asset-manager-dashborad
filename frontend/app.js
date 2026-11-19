@@ -644,6 +644,19 @@ async function loadInvestments() {
   netEl.textContent = fmtSigned(summary.net);
   netEl.className = "stat-value " + (summary.net >= 0 ? "good" : "critical");
 
+  const catTbody = document.querySelector("#investmentCategoryTable tbody");
+  catTbody.innerHTML = "";
+  Object.entries(summary.by_category)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .forEach(([category, value]) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${category}</td>
+        <td class="${value >= 0 ? "gain-pos" : "gain-neg"}">${fmtSigned(value)}</td>
+      `;
+      catTbody.appendChild(tr);
+    });
+
   const tbody = document.querySelector("#investmentTable tbody");
   tbody.innerHTML = "";
   items.forEach((t) => {
