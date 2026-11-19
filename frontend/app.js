@@ -529,7 +529,7 @@ async function loadLedger() {
   ]);
 
   const categories = Object.entries(txSummary.by_category).sort((a, b) => b[1] - a[1]);
-  const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5"];
+  const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-6", "--series-7", "--series-8"];
   renderDonut("expenseChart", "expenseLegend",
     categories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] }))
   );
@@ -702,7 +702,7 @@ async function loadYearly() {
     subRows.push({ major, minor, value });
   });
 
-  const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-8"];
+  const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-6", "--series-7", "--series-8"];
   const majorCategories = Object.entries(majorTotals).sort((a, b) => b[1] - a[1]);
   renderDonut("yearlyCategoryChart", "yearlyCategoryLegend",
     majorCategories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] }))
