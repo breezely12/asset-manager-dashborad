@@ -40,6 +40,8 @@ function splitCategory(full) {
 
 const fmtKRW = (n) => n == null ? "-" : new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(n) + "원";
 const fmtSigned = (n) => n == null ? "-" : (n >= 0 ? "+" : "") + new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(n) + "원";
+const fmtMillions = (n) => n == null ? "-" : new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(n / 1e6) + "백만원";
+const fmtSignedMillions = (n) => n == null ? "-" : (n >= 0 ? "+" : "") + new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(n / 1e6) + "백만원";
 const fmtPct = (n) => n == null ? "" : ` (${n >= 0 ? "+" : ""}${n.toFixed(1)}%)`;
 const cssVar = (name) => getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(name).trim();
 
@@ -373,8 +375,8 @@ async function loadHoldings() {
       <td>${h.quantity ?? "-"}</td>
       <td>${h.avg_cost != null ? h.avg_cost.toLocaleString() : "-"}</td>
       <td>${h.current_price != null ? h.current_price.toLocaleString() : "-"}</td>
-      <td>${fmtKRW(h.value_krw)}</td>
-      <td class="${gainClass}">${h.gain_krw != null ? fmtSigned(h.gain_krw) + fmtPct(h.gain_pct) : "-"}</td>
+      <td>${fmtMillions(h.value_krw)}</td>
+      <td class="${gainClass}">${h.gain_krw != null ? fmtSignedMillions(h.gain_krw) + fmtPct(h.gain_pct) : "-"}</td>
       <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
     `;
     tr.querySelector(".edit-btn").addEventListener("click", () => openHoldingModal(h));
