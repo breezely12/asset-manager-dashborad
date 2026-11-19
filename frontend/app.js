@@ -10,7 +10,7 @@ const CATEGORY_ORDER = ["stock", "crypto", "cash", "realestate", "other"];
 
 // household-ledger 대분류 -> 소분류, following the user's reference budget sheet
 const LEDGER_CATEGORY_TAXONOMY = {
-  "수입": ["본인월급", "본인상여", "부수입", "투자소득", "기타소득"],
+  "수입": ["본인월급", "본인상여", "부수입", "투자소득", "기타소득", "양육비"],
   "저축·투자": ["예적금", "주식계좌", "대출원금상환", "펀드/ETF", "달러/금", "가상화폐"],
   "연금·노후": ["개인연금", "퇴직연금", "국민연금"],
   "비상금": ["비상금통장1", "비상금통장2"],
