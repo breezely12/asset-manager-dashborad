@@ -316,6 +316,17 @@ input[type="month"], input[type="date"] {
 }
 .category-box-expense h4 { color: var(--series-8); }
 
+.category-major-row { cursor: pointer; font-weight: 500; }
+.category-major-row:hover { background: var(--page); }
+.category-toggle {
+  display: inline-block;
+  width: 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.category-minor-row td:nth-child(2) { padding-left: 28px; color: var(--text-secondary); }
+.category-minor-row.hidden { display: none; }
+
 @media (max-width: 860px) {
   .category-box-grid { grid-template-columns: 1fr; }
 }

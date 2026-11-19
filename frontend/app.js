@@ -564,11 +564,61 @@ async function loadLedger() {
     });
   };
   fillCategoryBox("txCategoryIncomeTable", txSummary.by_category_income, txSummary.income);
-  fillCategoryBox("txCategoryExpenseTable", txSummary.by_category, txSummary.expense);
+  fillExpenseCategoryBox("txCategoryExpenseTable", txSummary.by_category, txSummary.expense);
 
   currentLedgerTxs = txs;
   populateTxFilterOptions(txs);
   renderTxTable();
+}
+
+function fillExpenseCategoryBox(tbodyId, byCategory, base) {
+  const tbody = document.querySelector(`#${tbodyId} tbody`);
+  tbody.innerHTML = "";
+
+  const majors = {};
+  Object.entries(byCategory).forEach(([full, value]) => {
+    const [major, minor] = splitCategory(full);
+    if (!majors[major]) majors[major] = { total: 0, minors: [] };
+    majors[major].total += value;
+    majors[major].minors.push({ minor, value });
+  });
+
+  Object.entries(majors)
+    .sort((a, b) => b[1].total - a[1].total)
+    .forEach(([major, group], i) => {
+      const pct = base > 0 ? (group.total / base * 100).toFixed(1) : "0.0";
+      const groupId = `exp-cat-group-${i}`;
+      const majorRow = document.createElement("tr");
+      majorRow.className = "category-major-row";
+      majorRow.innerHTML = `
+        <td><span class="category-toggle">▸</span> ${major}</td>
+        <td>-</td>
+        <td>${fmtKRW(group.total)}</td>
+        <td>${pct}%</td>
+      `;
+      majorRow.addEventListener("click", () => {
+        const expanded = majorRow.classList.toggle("expanded");
+        majorRow.querySelector(".category-toggle").textContent = expanded ? "▾" : "▸";
+        tbody.querySelectorAll(`tr[data-group="${groupId}"]`).forEach((tr) => {
+          tr.classList.toggle("hidden", !expanded);
+        });
+      });
+      tbody.appendChild(majorRow);
+
+      group.minors.sort((a, b) => b.value - a.value).forEach((m) => {
+        const minorPct = base > 0 ? (m.value / base * 100).toFixed(1) : "0.0";
+        const minorRow = document.createElement("tr");
+        minorRow.className = "category-minor-row hidden";
+        minorRow.dataset.group = groupId;
+        minorRow.innerHTML = `
+          <td></td>
+          <td>${m.minor || "-"}</td>
+          <td>${fmtKRW(m.value)}</td>
+          <td>${minorPct}%</td>
+        `;
+        tbody.appendChild(minorRow);
+      });
+    });
 }
 
 let currentLedgerTxs = [];
