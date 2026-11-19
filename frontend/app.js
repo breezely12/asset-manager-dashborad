@@ -689,11 +689,39 @@ async function loadYearly() {
 
   renderMonthlyBars("yearlyMonthlyChart", "yearlyMonthlyLegend", data.months);
 
+  const splitCategory = (full) => {
+    const idx = full.indexOf("-");
+    return idx === -1 ? [full, ""] : [full.slice(0, idx), full.slice(idx + 1)];
+  };
+
+  const majorTotals = {};
+  const subRows = [];
+  Object.entries(data.by_category).forEach(([full, value]) => {
+    const [major, minor] = splitCategory(full);
+    majorTotals[major] = (majorTotals[major] || 0) + value;
+    subRows.push({ major, minor, value });
+  });
+
   const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-8"];
-  const categories = Object.entries(data.by_category).sort((a, b) => b[1] - a[1]);
+  const majorCategories = Object.entries(majorTotals).sort((a, b) => b[1] - a[1]);
   renderDonut("yearlyCategoryChart", "yearlyCategoryLegend",
-    categories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] }))
+    majorCategories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] }))
   );
+
+  const totalExpense = subRows.reduce((s, r) => s + r.value, 0);
+  const tbody = document.querySelector("#yearlyCategoryTable tbody");
+  tbody.innerHTML = "";
+  subRows.sort((a, b) => b.value - a.value).forEach((r) => {
+    const tr = document.createElement("tr");
+    const pct = totalExpense > 0 ? (r.value / totalExpense * 100).toFixed(1) : "0.0";
+    tr.innerHTML = `
+      <td>${r.major}</td>
+      <td>${r.minor || "-"}</td>
+      <td>${fmtKRW(r.value)}</td>
+      <td>${pct}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
 document.getElementById("yearlySelect").addEventListener("change", loadYearly);

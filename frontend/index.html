@@ -175,12 +175,22 @@
         </div>
       </div>
       <div class="chart-card">
-        <h3>연간 지출 카테고리</h3>
+        <h3>연간 지출 카테고리 (대분류)</h3>
         <div class="chart-body">
           <svg id="yearlyCategoryChart" viewBox="0 0 240 240"></svg>
           <ul id="yearlyCategoryLegend" class="legend"></ul>
         </div>
       </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>소분류별 지출 내역</h3>
+      <table class="data-table" id="yearlyCategoryTable">
+        <thead>
+          <tr><th>대분류</th><th>소분류</th><th>금액</th><th>비중</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
   </section>
 
