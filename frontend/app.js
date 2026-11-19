@@ -971,47 +971,263 @@ async function loadYearlyYears() {
   select.value = currentYear;
 }
 
+let yearlyData = null;
+
+function majorTotalsOf(byCategory) {
+  const totals = {};
+  Object.entries(byCategory).forEach(([full, value]) => {
+    const [major] = splitCategory(full);
+    totals[major] = (totals[major] || 0) + value;
+  });
+  return Object.entries(totals).sort((a, b) => b[1] - a[1]);
+}
+
+function renderHBarList(containerId, majorTotalsList, base, limit) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  const list = limit ? majorTotalsList.slice(0, limit) : majorTotalsList;
+  const maxV = Math.max(...list.map(([, v]) => v), 1);
+  list.forEach(([label, value]) => {
+    const pctOfMax = (value / maxV * 100).toFixed(1);
+    const row = document.createElement("div");
+    row.className = "yearly-hbar-row";
+    row.innerHTML = `
+      <div class="yearly-hbar-label">${label}</div>
+      <div class="yearly-hbar-track"><div class="yearly-hbar-fill" style="width:${pctOfMax}%"></div></div>
+      <div class="yearly-hbar-value">${fmtKRW(value)}</div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function renderSavingsDonut(income, expense) {
+  const svg = document.getElementById("yearlySavingsDonut");
+  svg.innerHTML = "";
+  const net = income - expense;
+  const savingsRate = income > 0 ? (net / income * 100) : 0;
+  const cx = 80, cy = 80, r = 58, strokeWidth = 20;
+  const circumference = 2 * Math.PI * r;
+  const ns = "http://www.w3.org/2000/svg";
+
+  const track = document.createElementNS(ns, "circle");
+  track.setAttribute("cx", cx); track.setAttribute("cy", cy); track.setAttribute("r", r);
+  track.setAttribute("fill", "none");
+  track.setAttribute("stroke", cssVar("--gridline"));
+  track.setAttribute("stroke-width", strokeWidth);
+  svg.appendChild(track);
+
+  const frac = Math.max(0, Math.min(1, savingsRate / 100));
+  if (frac > 0) {
+    const dash = frac * circumference;
+    const arc = document.createElementNS(ns, "circle");
+    arc.setAttribute("cx", cx); arc.setAttribute("cy", cy); arc.setAttribute("r", r);
+    arc.setAttribute("fill", "none");
+    arc.setAttribute("stroke", cssVar("--accent"));
+    arc.setAttribute("stroke-width", strokeWidth);
+    arc.setAttribute("stroke-linecap", "round");
+    arc.setAttribute("stroke-dasharray", `${dash} ${circumference - dash}`);
+    arc.setAttribute("transform", `rotate(-90 ${cx} ${cy})`);
+    svg.appendChild(arc);
+  }
+
+  const label = document.createElementNS(ns, "text");
+  label.setAttribute("x", cx); label.setAttribute("y", cy - 6);
+  label.setAttribute("text-anchor", "middle");
+  label.setAttribute("font-size", "11");
+  label.setAttribute("fill", cssVar("--text-muted"));
+  label.textContent = "저축률";
+  svg.appendChild(label);
+
+  const value = document.createElementNS(ns, "text");
+  value.setAttribute("x", cx); value.setAttribute("y", cy + 16);
+  value.setAttribute("text-anchor", "middle");
+  value.setAttribute("font-size", "22");
+  value.setAttribute("font-weight", "700");
+  value.setAttribute("fill", savingsRate >= 0 ? cssVar("--text-primary") : cssVar("--critical"));
+  value.textContent = `${savingsRate.toFixed(0)}%`;
+  svg.appendChild(value);
+}
+
+function renderYearlyTrend(months) {
+  const svg = document.getElementById("yearlyTrendChart");
+  svg.innerHTML = "";
+  const legend = document.getElementById("yearlyTrendLegend");
+  legend.innerHTML = `
+    <li><span class="swatch" style="background:${cssVar("--series-1")}"></span>수입</li>
+    <li><span class="swatch" style="background:${cssVar("--series-8")}"></span>지출</li>
+    <li><span class="swatch" style="background:${cssVar("--accent")}"></span>저축률</li>
+  `;
+  const ns = "http://www.w3.org/2000/svg";
+  const W = 900, H = 260, padL = 10, padR = 10, padT = 36, padB = 24;
+  const barAreaTop = padT, barAreaBottom = H - padB;
+  const maxV = Math.max(...months.flatMap((m) => [m.income, m.expense]), 1);
+  const groupW = (W - padL - padR) / months.length;
+  const barW = Math.min(groupW / 2 - 4, 22);
+
+  const baseline = document.createElementNS(ns, "line");
+  baseline.setAttribute("x1", padL); baseline.setAttribute("x2", W - padR);
+  baseline.setAttribute("y1", barAreaBottom); baseline.setAttribute("y2", barAreaBottom);
+  baseline.setAttribute("stroke", cssVar("--baseline"));
+  svg.appendChild(baseline);
+
+  const points = [];
+  months.forEach((m, i) => {
+    const groupX = padL + i * groupW;
+    const incH = (m.income / maxV) * (barAreaBottom - barAreaTop);
+    const expH = (m.expense / maxV) * (barAreaBottom - barAreaTop);
+
+    const incRect = document.createElementNS(ns, "rect");
+    incRect.setAttribute("x", groupX + groupW / 2 - barW - 1);
+    incRect.setAttribute("y", barAreaBottom - incH);
+    incRect.setAttribute("width", barW); incRect.setAttribute("height", Math.max(incH, 0.5));
+    incRect.setAttribute("rx", 3);
+    incRect.setAttribute("fill", cssVar("--series-1"));
+    svg.appendChild(incRect);
+
+    const expRect = document.createElementNS(ns, "rect");
+    expRect.setAttribute("x", groupX + groupW / 2 + 1);
+    expRect.setAttribute("y", barAreaBottom - expH);
+    expRect.setAttribute("width", barW); expRect.setAttribute("height", Math.max(expH, 0.5));
+    expRect.setAttribute("rx", 3);
+    expRect.setAttribute("fill", cssVar("--series-8"));
+    svg.appendChild(expRect);
+
+    const label = document.createElementNS(ns, "text");
+    label.setAttribute("x", groupX + groupW / 2); label.setAttribute("y", H - 6);
+    label.setAttribute("text-anchor", "middle"); label.setAttribute("font-size", "10");
+    label.setAttribute("fill", cssVar("--text-secondary"));
+    label.textContent = m.month.slice(5);
+    svg.appendChild(label);
+
+    const rate = m.income > 0 ? (m.income - m.expense) / m.income * 100 : 0;
+    const rateY = padT - 10 + (1 - Math.max(0, Math.min(100, rate)) / 100) * 18;
+    points.push({ x: groupX + groupW / 2, y: rateY, rate });
+  });
+
+  if (points.length > 1) {
+    const path = document.createElementNS(ns, "polyline");
+    path.setAttribute("points", points.map((p) => `${p.x},${p.y}`).join(" "));
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", cssVar("--accent"));
+    path.setAttribute("stroke-width", "2");
+    svg.appendChild(path);
+  }
+  points.forEach((p) => {
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y); dot.setAttribute("r", 3);
+    dot.setAttribute("fill", cssVar("--accent"));
+    svg.appendChild(dot);
+
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", p.x); t.setAttribute("y", p.y - 8);
+    t.setAttribute("text-anchor", "middle"); t.setAttribute("font-size", "9.5");
+    t.setAttribute("fill", cssVar("--accent"));
+    t.textContent = `${p.rate.toFixed(1)}%`;
+    svg.appendChild(t);
+  });
+}
+
+function buildYearlySheet(monthlyIncome, monthlyExpense) {
+  const header = document.getElementById("yearlySheetHeaderRow");
+  header.innerHTML = `<th>대분류</th><th>소분류</th>` +
+    Array.from({ length: 12 }, (_, i) => `<th>${i + 1}월</th>`).join("") +
+    `<th>합계</th><th>월평균</th>`;
+
+  const tbody = document.querySelector("#yearlySheetTable tbody");
+  tbody.innerHTML = "";
+
+  const addSection = (label, monthlyByCategory) => {
+    const sectionRow = document.createElement("tr");
+    sectionRow.className = "sheet-section-row";
+    sectionRow.innerHTML = `<td colspan="16">${label}</td>`;
+    tbody.appendChild(sectionRow);
+
+    const majors = {};
+    Object.entries(monthlyByCategory).forEach(([full, monthsArr]) => {
+      const [major, minor] = splitCategory(full);
+      if (!majors[major]) majors[major] = [];
+      majors[major].push({ minor, months: monthsArr });
+    });
+
+    const sectionTotals = Array(12).fill(0);
+    Object.entries(majors).forEach(([major, minors]) => {
+      const majorTotals = Array(12).fill(0);
+      minors.forEach((m) => m.months.forEach((v, i) => (majorTotals[i] += v)));
+      const majorSum = majorTotals.reduce((a, b) => a + b, 0);
+
+      minors.forEach((m, idx) => {
+        const tr = document.createElement("tr");
+        const sum = m.months.reduce((a, b) => a + b, 0);
+        const avg = sum / 12;
+        let cells = "";
+        if (idx === 0) cells += `<td class="sheet-major-cell" rowspan="${minors.length}">${major}</td>`;
+        cells += `<td>${m.minor || "-"}</td>`;
+        cells += m.months.map((v) => `<td>${v ? fmtKRW(v).replace("원", "") : "-"}</td>`).join("");
+        cells += `<td>${fmtKRW(sum)}</td><td>${fmtKRW(Math.round(avg))}</td>`;
+        tr.innerHTML = cells;
+        tbody.appendChild(tr);
+      });
+
+      const subtotalRow = document.createElement("tr");
+      subtotalRow.className = "sheet-subtotal-row";
+      subtotalRow.innerHTML = `<td colspan="2">${major} 소계</td>` +
+        majorTotals.map((v) => `<td>${v ? fmtKRW(v).replace("원", "") : "-"}</td>`).join("") +
+        `<td>${fmtKRW(majorSum)}</td><td>${fmtKRW(Math.round(majorSum / 12))}</td>`;
+      tbody.appendChild(subtotalRow);
+
+      majorTotals.forEach((v, i) => (sectionTotals[i] += v));
+    });
+
+    const sectionSum = sectionTotals.reduce((a, b) => a + b, 0);
+    const totalRow = document.createElement("tr");
+    totalRow.className = "sheet-total-row";
+    totalRow.innerHTML = `<td colspan="2">${label} 합계</td>` +
+      sectionTotals.map((v) => `<td>${v ? fmtKRW(v).replace("원", "") : "-"}</td>`).join("") +
+      `<td>${fmtKRW(sectionSum)}</td><td>${fmtKRW(Math.round(sectionSum / 12))}</td>`;
+    tbody.appendChild(totalRow);
+  };
+
+  addSection("수입", monthlyIncome);
+  addSection("지출", monthlyExpense);
+}
+
 async function loadYearly() {
   const year = document.getElementById("yearlySelect").value;
   const data = await api(`/transactions/yearly?year=${year}`);
+  yearlyData = data;
 
-  document.getElementById("yearlyIncome").textContent = fmtKRW(data.total_income);
-  document.getElementById("yearlyExpense").textContent = fmtKRW(data.total_expense);
-  const netEl = document.getElementById("yearlyNet");
-  netEl.textContent = fmtSigned(data.net);
-  netEl.className = "stat-value " + (data.net >= 0 ? "good" : "critical");
+  document.getElementById("yearlySavingsTitle").textContent = `${year}년 연간결산`;
+  renderSavingsDonut(data.total_income, data.total_expense);
+  document.querySelector("#yearlySavingsIncome").textContent = fmtKRW(data.total_income);
+  document.querySelector("#yearlySavingsExpense").textContent = fmtKRW(data.total_expense);
+  const barPct = data.total_income > 0 ? Math.min(100, data.total_expense / data.total_income * 100) : 0;
+  document.getElementById("yearlySavingsBarFill").style.width = `${barPct}%`;
 
-  renderMonthlyBars("yearlyMonthlyChart", "yearlyMonthlyLegend", data.months);
+  const incomeMajors = majorTotalsOf(data.by_category_income);
+  const expenseMajors = majorTotalsOf(data.by_category);
+  document.getElementById("yearlyIncomePill").textContent = `수입 ${fmtKRW(data.total_income)}`;
+  document.getElementById("yearlyExpensePill").textContent = `지출 ${fmtKRW(data.total_expense)}`;
+  document.getElementById("yearlyIncomeAvg").textContent = `월평균 ${fmtKRW(Math.round(data.total_income / 12))}`;
+  document.getElementById("yearlyExpenseAvg").textContent = `월평균 ${fmtKRW(Math.round(data.total_expense / 12))}`;
+  renderHBarList("yearlyIncomeBars", incomeMajors, data.total_income);
+  renderHBarList("yearlyExpenseBars", expenseMajors, data.total_expense, 12);
 
-  const majorTotals = {};
-  const subRows = [];
-  Object.entries(data.by_category).forEach(([full, value]) => {
-    const [major, minor] = splitCategory(full);
-    majorTotals[major] = (majorTotals[major] || 0) + value;
-    subRows.push({ major, minor, value });
-  });
+  const paymentTotals = Object.entries(data.payment_method_totals).sort((a, b) => b[1] - a[1]);
+  renderHBarList("yearlyPaymentBars", paymentTotals, data.total_expense);
 
-  const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-6", "--series-7", "--series-8"];
-  const majorCategories = Object.entries(majorTotals).sort((a, b) => b[1] - a[1]);
-  renderDonut("yearlyCategoryChart", "yearlyCategoryLegend",
-    majorCategories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] }))
-  );
-
-  const totalExpense = subRows.reduce((s, r) => s + r.value, 0);
-  const tbody = document.querySelector("#yearlyCategoryTable tbody");
-  tbody.innerHTML = "";
-  subRows.sort((a, b) => b.value - a.value).forEach((r) => {
-    const tr = document.createElement("tr");
-    const pct = totalExpense > 0 ? (r.value / totalExpense * 100).toFixed(1) : "0.0";
-    tr.innerHTML = `
-      <td>${r.major}</td>
-      <td>${r.minor || "-"}</td>
-      <td>${fmtKRW(r.value)}</td>
-      <td>${pct}%</td>
-    `;
-    tbody.appendChild(tr);
-  });
+  renderYearlyTrend(data.months);
+  buildYearlySheet(data.monthly_by_category_income, data.monthly_by_category);
 }
+
+document.querySelectorAll(".yearly-toggle-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".yearly-toggle-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    const view = btn.dataset.view;
+    document.querySelector(".yearly-savings-income").classList.toggle("highlight", view === "income");
+    document.querySelector(".yearly-savings-expense").classList.toggle("highlight", view === "expense");
+  });
+});
 
 document.getElementById("yearlySelect").addEventListener("change", loadYearly);
 document.querySelector('.tab-btn[data-tab="yearly"]').addEventListener("click", loadYearly);

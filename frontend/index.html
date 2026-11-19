@@ -202,46 +202,55 @@
       </div>
     </div>
 
-    <div class="stat-row">
-      <div class="stat-tile">
-        <div class="stat-label">연간 총수입</div>
-        <div class="stat-value" id="yearlyIncome">-</div>
+    <div class="yearly-summary-grid">
+      <div class="yearly-savings-card">
+        <div class="yearly-savings-title" id="yearlySavingsTitle">연간결산</div>
+        <div class="yearly-savings-sub">수입 vs 지출</div>
+        <svg id="yearlySavingsDonut" viewBox="0 0 160 160"></svg>
+        <div class="yearly-toggle">
+          <button type="button" class="yearly-toggle-btn active" data-view="income">수입</button>
+          <button type="button" class="yearly-toggle-btn" data-view="expense">지출</button>
+        </div>
+        <div class="yearly-savings-numbers">
+          <div class="yearly-savings-income highlight"><span>총수입</span><span id="yearlySavingsIncome">-</span></div>
+          <div class="yearly-savings-bar"><div class="yearly-savings-bar-fill" id="yearlySavingsBarFill"></div></div>
+          <div class="yearly-savings-expense"><span>총지출</span><span id="yearlySavingsExpense">-</span></div>
+        </div>
       </div>
-      <div class="stat-tile">
-        <div class="stat-label">연간 총지출</div>
-        <div class="stat-value" id="yearlyExpense">-</div>
-      </div>
-      <div class="stat-tile stat-tile-primary">
-        <div class="stat-label">연간 순수입</div>
-        <div class="stat-value" id="yearlyNet">-</div>
-      </div>
-    </div>
 
-    <div class="chart-grid">
-      <div class="chart-card">
-        <h3>월별 수입/지출</h3>
-        <div class="chart-body">
-          <svg id="yearlyMonthlyChart" viewBox="0 0 480 240" preserveAspectRatio="none"></svg>
-          <ul id="yearlyMonthlyLegend" class="legend"></ul>
-        </div>
+      <div class="yearly-bar-card">
+        <div class="yearly-bar-pill" id="yearlyIncomePill">수입 -</div>
+        <div class="yearly-bar-avg" id="yearlyIncomeAvg"></div>
+        <div class="yearly-hbar-list" id="yearlyIncomeBars"></div>
       </div>
-      <div class="chart-card">
-        <h3>연간 지출 카테고리 (대분류)</h3>
-        <div class="chart-body">
-          <svg id="yearlyCategoryChart" viewBox="0 0 240 240"></svg>
-          <ul id="yearlyCategoryLegend" class="legend"></ul>
-        </div>
+
+      <div class="yearly-bar-card">
+        <div class="yearly-bar-pill" id="yearlyExpensePill">지출 -</div>
+        <div class="yearly-bar-avg" id="yearlyExpenseAvg"></div>
+        <div class="yearly-hbar-list" id="yearlyExpenseBars"></div>
+        <div class="yearly-hbar-sub-title">결제수단별</div>
+        <div class="yearly-hbar-list yearly-hbar-list-sm" id="yearlyPaymentBars"></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <h3>소분류별 지출 내역</h3>
-      <table class="data-table" id="yearlyCategoryTable">
-        <thead>
-          <tr><th>대분류</th><th>소분류</th><th>금액</th><th>비중</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <h3>월별 추이 (수입·지출, 저축률)</h3>
+      <div class="chart-body">
+        <svg id="yearlyTrendChart" viewBox="0 0 900 260" preserveAspectRatio="none"></svg>
+      </div>
+      <ul id="yearlyTrendLegend" class="legend-row"></ul>
+    </div>
+
+    <div class="chart-card">
+      <div class="panel-header"><h3>대분류/소분류 월별 내역</h3></div>
+      <div class="yearly-sheet-wrap">
+        <table class="data-table yearly-sheet-table" id="yearlySheetTable">
+          <thead>
+            <tr id="yearlySheetHeaderRow"></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </section>
 

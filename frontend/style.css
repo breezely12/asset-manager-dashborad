@@ -24,6 +24,9 @@
   --series-6: #15803d; /* forest */
   --series-7: #7c3aed; /* violet */
   --series-8: #b91c1c; /* brick red */
+
+  --accent: #e07628; /* orange accent for the yearly report */
+  --accent-soft: #f3a567;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -49,6 +52,9 @@
     --series-6: #22a555;
     --series-7: #9d5cf0;
     --series-8: #e35050;
+
+    --accent: #f0924f;
+    --accent-soft: #c9712f;
   }
 }
 
@@ -433,3 +439,108 @@ input[type="month"], input[type="date"] {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 .category-picker-close:hover { background: var(--gridline); color: var(--text-primary); }
+
+/* ---------- yearly report (연간결산) ---------- */
+.yearly-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1.3fr;
+  gap: 14px;
+  margin-bottom: 24px;
+  align-items: stretch;
+}
+@media (max-width: 1000px) {
+  .yearly-summary-grid { grid-template-columns: 1fr; }
+}
+
+.yearly-savings-card, .yearly-bar-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.yearly-savings-title { font-size: 15px; font-weight: 700; }
+.yearly-savings-sub { font-size: 12px; color: var(--text-muted); margin: 2px 0 8px; }
+.yearly-savings-card svg { display: block; margin: 0 auto; }
+
+.yearly-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--page);
+  border-radius: 8px;
+  padding: 3px;
+  margin: 10px 0;
+}
+.yearly-toggle-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.yearly-toggle-btn.active { background: var(--accent); color: #fff; }
+
+.yearly-savings-numbers { font-size: 12px; }
+.yearly-savings-income, .yearly-savings-expense { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.yearly-savings-income.highlight, .yearly-savings-expense.highlight { font-weight: 700; color: var(--accent); }
+.yearly-savings-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--gridline);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.yearly-savings-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+
+.yearly-bar-pill {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 999px;
+}
+.yearly-bar-avg { font-size: 11px; color: var(--text-muted); margin: 8px 0 12px; }
+
+.yearly-hbar-list { display: flex; flex-direction: column; gap: 8px; }
+.yearly-hbar-row { display: grid; grid-template-columns: 76px 1fr 72px; align-items: center; gap: 8px; font-size: 12px; }
+.yearly-hbar-label { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yearly-hbar-track { height: 10px; background: var(--page); border-radius: 5px; overflow: hidden; }
+.yearly-hbar-fill { height: 100%; background: var(--accent); border-radius: 5px; }
+.yearly-hbar-value { text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.yearly-hbar-sub-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 16px 0 10px; }
+.yearly-hbar-list-sm .yearly-hbar-fill { background: var(--accent-soft); }
+
+.legend-row { display: flex; flex-wrap: wrap; gap: 16px; list-style: none; margin: 10px 0 0; padding: 0; font-size: 12px; }
+.legend-row li { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.legend-row .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+.yearly-sheet-wrap { overflow-x: auto; }
+.yearly-sheet-table { font-size: 12.5px; min-width: 1100px; }
+.yearly-sheet-table th, .yearly-sheet-table td { padding: 7px 10px; }
+.yearly-sheet-table .sheet-major-cell {
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-1));
+  vertical-align: middle;
+}
+.yearly-sheet-table .sheet-subtotal-row td {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+  font-weight: 600;
+}
+.yearly-sheet-table .sheet-total-row td {
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-1));
+  font-weight: 700;
+}
+.yearly-sheet-table .sheet-section-row td {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}

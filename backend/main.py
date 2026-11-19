@@ -391,7 +391,8 @@ def transactions_yearly(year: str, kind: str = "ledger"):
         rows = [
             dict(r)
             for r in conn.execute(
-                "SELECT date, type, category, amount FROM transactions WHERE kind = ? AND count_in_total = 1 AND date LIKE ?",
+                "SELECT date, type, category, amount, payment_method FROM transactions "
+                "WHERE kind = ? AND count_in_total = 1 AND date LIKE ?",
                 (kind, f"{year}-%"),
             )
         ]
@@ -404,9 +405,25 @@ def transactions_yearly(year: str, kind: str = "ledger"):
         months.append({"month": month_key, "income": income, "expense": expense})
 
     by_category: dict[str, float] = {}
+    by_category_income: dict[str, float] = {}
+    monthly_by_category: dict[str, list[float]] = {}
+    monthly_by_category_income: dict[str, list[float]] = {}
+    payment_method_totals: dict[str, float] = {}
+
     for r in rows:
+        month_idx = int(r["date"][5:7]) - 1
         if r["type"] == "expense":
             by_category[r["category"]] = by_category.get(r["category"], 0.0) + r["amount"]
+            bucket = monthly_by_category.setdefault(r["category"], [0.0] * 12)
+            bucket[month_idx] += r["amount"]
+            if r["payment_method"]:
+                payment_method_totals[r["payment_method"]] = (
+                    payment_method_totals.get(r["payment_method"], 0.0) + r["amount"]
+                )
+        else:
+            by_category_income[r["category"]] = by_category_income.get(r["category"], 0.0) + r["amount"]
+            bucket = monthly_by_category_income.setdefault(r["category"], [0.0] * 12)
+            bucket[month_idx] += r["amount"]
 
     total_income = sum(mo["income"] for mo in months)
     total_expense = sum(mo["expense"] for mo in months)
@@ -414,6 +431,10 @@ def transactions_yearly(year: str, kind: str = "ledger"):
         "year": year,
         "months": months,
         "by_category": by_category,
+        "by_category_income": by_category_income,
+        "monthly_by_category": monthly_by_category,
+        "monthly_by_category_income": monthly_by_category_income,
+        "payment_method_totals": payment_method_totals,
         "total_income": total_income,
         "total_expense": total_expense,
         "net": total_income - total_expense,
