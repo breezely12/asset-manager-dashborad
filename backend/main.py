@@ -360,10 +360,19 @@ def transactions_summary(month: str, kind: str = "ledger"):
     income = sum(r["amount"] for r in rows if r["type"] == "income")
     expense = sum(r["amount"] for r in rows if r["type"] == "expense")
     by_category: dict[str, float] = {}
+    by_category_income: dict[str, float] = {}
     for r in rows:
         if r["type"] == "expense":
             by_category[r["category"]] = by_category.get(r["category"], 0.0) + r["amount"]
-    return {"income": income, "expense": expense, "net": income - expense, "by_category": by_category}
+        else:
+            by_category_income[r["category"]] = by_category_income.get(r["category"], 0.0) + r["amount"]
+    return {
+        "income": income,
+        "expense": expense,
+        "net": income - expense,
+        "by_category": by_category,
+        "by_category_income": by_category_income,
+    }
 
 
 @app.get("/api/transactions/years")

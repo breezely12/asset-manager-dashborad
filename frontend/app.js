@@ -540,6 +540,29 @@ async function loadLedger() {
     categories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] }))
   );
 
+  const catTbody = document.querySelector("#txCategoryTable tbody");
+  catTbody.innerHTML = "";
+  const expenseRows = Object.entries(txSummary.by_category).map(([full, value]) => {
+    const [major, minor] = splitCategory(full);
+    return { type: "지출", major, minor, value, base: txSummary.expense };
+  });
+  const incomeRows = Object.entries(txSummary.by_category_income).map(([full, value]) => {
+    const [major, minor] = splitCategory(full);
+    return { type: "수입", major, minor, value, base: txSummary.income };
+  });
+  [...incomeRows, ...expenseRows].sort((a, b) => b.value - a.value).forEach((r) => {
+    const pct = r.base > 0 ? (r.value / r.base * 100).toFixed(1) : "0.0";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.type}</td>
+      <td>${r.major}</td>
+      <td>${r.minor || "-"}</td>
+      <td>${fmtKRW(r.value)}</td>
+      <td>${pct}%</td>
+    `;
+    catTbody.appendChild(tr);
+  });
+
   const tbody = document.querySelector("#txTable tbody");
   tbody.innerHTML = "";
   txs.forEach((t) => {
