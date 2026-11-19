@@ -563,9 +563,77 @@ async function loadLedger() {
     catTbody.appendChild(tr);
   });
 
+  currentLedgerTxs = txs;
+  populateTxFilterOptions(txs);
+  renderTxTable();
+}
+
+let currentLedgerTxs = [];
+const txFilters = { type: "", major: "", minor: "", payment_method: "" };
+const txSort = { col: "date", dir: "desc" };
+
+function populateTxFilterOptions(txs) {
+  const majorSelect = document.getElementById("txFilterMajor");
+  const paymentSelect = document.getElementById("txFilterPayment");
+
+  const majors = Object.keys(LEDGER_CATEGORY_TAXONOMY);
+  majorSelect.innerHTML = `<option value="">대분류: 전체</option>` +
+    majors.map((m) => `<option value="${m}" ${txFilters.major === m ? "selected" : ""}>${m}</option>`).join("");
+
+  updateMinorFilterOptions();
+
+  const payments = Array.from(new Set(txs.map((t) => t.payment_method).filter(Boolean))).sort();
+  paymentSelect.innerHTML = `<option value="">결제수단: 전체</option>` +
+    payments.map((p) => `<option value="${p}" ${txFilters.payment_method === p ? "selected" : ""}>${p}</option>`).join("");
+  if (!payments.includes(txFilters.payment_method)) txFilters.payment_method = "";
+
+  document.getElementById("txFilterType").value = txFilters.type;
+}
+
+function updateMinorFilterOptions() {
+  const minorSelect = document.getElementById("txFilterMinor");
+  const minors = txFilters.major ? (LEDGER_CATEGORY_TAXONOMY[txFilters.major] || []) : [];
+  minorSelect.innerHTML = `<option value="">소분류: 전체</option>` +
+    minors.map((m) => `<option value="${m}" ${txFilters.minor === m ? "selected" : ""}>${m}</option>`).join("");
+  if (!minors.includes(txFilters.minor)) txFilters.minor = "";
+}
+
+function renderTxTable() {
   const tbody = document.querySelector("#txTable tbody");
   tbody.innerHTML = "";
-  txs.forEach((t) => {
+
+  let rows = currentLedgerTxs.filter((t) => {
+    const [major, minor] = splitCategory(t.category);
+    if (txFilters.type && t.type !== txFilters.type) return false;
+    if (txFilters.major && major !== txFilters.major) return false;
+    if (txFilters.minor && minor !== txFilters.minor) return false;
+    if (txFilters.payment_method && t.payment_method !== txFilters.payment_method) return false;
+    return true;
+  });
+
+  const dir = txSort.dir === "asc" ? 1 : -1;
+  rows = rows.slice().sort((a, b) => {
+    let av, bv;
+    if (txSort.col === "major" || txSort.col === "minor") {
+      const [aMajor, aMinor] = splitCategory(a.category);
+      const [bMajor, bMinor] = splitCategory(b.category);
+      av = txSort.col === "major" ? aMajor : aMinor;
+      bv = txSort.col === "major" ? bMajor : bMinor;
+    } else {
+      av = a[txSort.col];
+      bv = b[txSort.col];
+    }
+    av = av ?? "";
+    bv = bv ?? "";
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+    return String(av).localeCompare(String(bv), "ko") * dir;
+  });
+
+  document.querySelectorAll('#txTable th.sortable .sort-arrow').forEach((el) => (el.textContent = ""));
+  const activeHeader = document.querySelector(`#txTable th.sortable[data-sort="${txSort.col}"] .sort-arrow`);
+  if (activeHeader) activeHeader.textContent = txSort.dir === "asc" ? "▲" : "▼";
+
+  rows.forEach((t) => {
     const tr = document.createElement("tr");
     if (!t.count_in_total) tr.className = "muted";
     const excludedTag = t.count_in_total ? "" : ' <span class="muted">(합계 제외)</span>';
@@ -596,6 +664,45 @@ async function loadLedger() {
     tbody.appendChild(tr);
   });
 }
+
+document.getElementById("txFilterType").addEventListener("change", (e) => {
+  txFilters.type = e.target.value;
+  renderTxTable();
+});
+document.getElementById("txFilterMajor").addEventListener("change", (e) => {
+  txFilters.major = e.target.value;
+  txFilters.minor = "";
+  updateMinorFilterOptions();
+  renderTxTable();
+});
+document.getElementById("txFilterMinor").addEventListener("change", (e) => {
+  txFilters.minor = e.target.value;
+  renderTxTable();
+});
+document.getElementById("txFilterPayment").addEventListener("change", (e) => {
+  txFilters.payment_method = e.target.value;
+  renderTxTable();
+});
+document.getElementById("txFilterReset").addEventListener("click", () => {
+  txFilters.type = "";
+  txFilters.major = "";
+  txFilters.minor = "";
+  txFilters.payment_method = "";
+  populateTxFilterOptions(currentLedgerTxs);
+  renderTxTable();
+});
+document.querySelectorAll('#txTable th.sortable').forEach((th) => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.sort;
+    if (txSort.col === col) {
+      txSort.dir = txSort.dir === "asc" ? "desc" : "asc";
+    } else {
+      txSort.col = col;
+      txSort.dir = col === "date" || col === "amount" ? "desc" : "asc";
+    }
+    renderTxTable();
+  });
+});
 
 async function moveTransactionKind(t, newKind) {
   await api(`/transactions/${t.id}`, { method: "PUT", body: JSON.stringify({ ...t, kind: newKind }) });
