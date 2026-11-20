@@ -270,6 +270,9 @@
     }
   };
 
+  // 인쇄는 iframe(임베드) 안에서 막히는 경우가 많아 숨김
+  if (window.self !== window.top) { $("print").remove(); document.querySelector(".actions").style.gridTemplateColumns = "1fr 1fr"; }
+
   render();
 </script>
 </body>
