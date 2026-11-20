@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>견적 계산기</title>
+<style>
+  :root {
+    --bg: #f6f2ec;
+    --paper: #fffdf9;
+    --cat: #efe6dc;
+    --ink: #2f2925;
+    --muted: #8a7b6d;
+    --line: #e4dbd0;
+    --accent: #a8876a;
+    --accent-dark: #7d6249;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 48px 24px 64px; }
+  h1 { font-size: 36px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
+  .bar { width: 48px; height: 3px; background: var(--accent); margin: 20px 0 14px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 32px; }
+
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 28px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; background: var(--paper); border-top: 3px solid var(--ink); border-bottom: 3px solid var(--ink); }
+  th { font-weight: 500; color: var(--muted); font-size: 14px; padding: 16px 12px; border-bottom: 1.5px solid var(--ink); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  tr:last-child td { border-bottom: none; }
+  td.cat { background: var(--cat); text-align: center; font-weight: 700; border-bottom: 1px solid #d6c8b8; width: 24%; }
+  td.cat small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  td.size { text-align: center; width: 16%; }
+  td.price { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; width: 18%; }
+  td.qty { text-align: center; width: 22%; }
+  td.line { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); width: 20%; }
+  tr.active td:not(.cat) { background: #fbf4ea; }
+  tr.active td.line { color: var(--ink); font-weight: 700; }
+
+  .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+  .stepper button { width: 34px; height: 34px; border: none; background: transparent; font-size: 18px; color: var(--accent-dark); cursor: pointer; }
+  .stepper button:hover { background: var(--cat); }
+  .stepper button:disabled { color: #cfc4b8; cursor: default; background: transparent; }
+  .stepper input { width: 46px; height: 34px; border: none; border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center; font-size: 15px; font-family: inherit; color: var(--ink); -moz-appearance: textfield; }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .stepper input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .card { background: var(--paper); border-top: 3px solid var(--ink); border-bottom: 3px solid var(--ink); padding: 22px 22px 24px; position: sticky; top: 20px; }
+  .card h2 { font-size: 18px; margin: 0 0 16px; }
+  .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+  .seg button { border: none; background: #fff; padding: 12px 8px; font-family: inherit; font-size: 15px; color: var(--muted); cursor: pointer; line-height: 1.3; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--ink); color: #fff; font-weight: 700; }
+  .seg button span { display: block; font-size: 12px; font-weight: 400; opacity: .8; }
+
+  .items { list-style: none; margin: 0 0 14px; padding: 0; max-height: 260px; overflow: auto; }
+  .items li { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  .items li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .empty { color: var(--muted); font-size: 14px; padding: 18px 0; text-align: center; border-bottom: 1px dashed var(--line); margin-bottom: 14px; }
+  .row { display: flex; justify-content: space-between; font-size: 15px; padding: 5px 0; font-variant-numeric: tabular-nums; }
+  .row.muted { color: var(--muted); }
+  .total { display: flex; justify-content: space-between; align-items: baseline; border-top: 1.5px solid var(--ink); margin-top: 10px; padding-top: 14px; }
+  .total b { font-size: 28px; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+  .total span { font-size: 15px; font-weight: 700; }
+  .vat { text-align: right; font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 20px; }
+  .actions button { padding: 11px 6px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-family: inherit; font-size: 14px; color: var(--ink); cursor: pointer; }
+  .actions button.primary { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; font-weight: 700; }
+  .actions button:hover { filter: brightness(.96); }
+  .toast { margin-top: 10px; font-size: 13px; color: var(--accent-dark); text-align: center; min-height: 18px; }
+
+  .note { color: var(--muted); font-size: 14px; margin-top: 18px; }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 28px; }
+    td, th { padding: 8px 6px; font-size: 14px; }
+    td.line { display: none; }
+    th.line { display: none; }
+    .stepper button { width: 30px; }
+    .stepper input { width: 38px; }
+  }
+  @media print {
+    body { background: #fff; }
+    .stepper button, .actions, .toast, .seg button:not(.on) { display: none; }
+    .seg { grid-template-columns: 1fr; border: none; }
+    .card { position: static; }
+    .layout { grid-template-columns: 1fr; }
+    tr:not(.active) td:not(.cat) { color: #bbb; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>견적 계산기</h1>
+  <div class="bar"></div>
+  <p class="sub">단위: 원 · 부가세 포함 · 수량을 입력하면 견적이 바로 계산됩니다</p>
+
+  <div class="layout">
+    <div>
+      <table>
+        <thead>
+          <tr><th>구분</th><th>사이즈</th><th>단가</th><th>수량</th><th class="line">금액</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <p class="note">※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.</p>
+    </div>
+
+    <aside class="card">
+      <h2>견적 요약</h2>
+      <div class="label">배송 지역</div>
+      <div class="seg" id="region">
+        <button data-region="seoul" class="on">서울<span>배송비 무료</span></button>
+        <button data-region="local">지방<span>배송비 60,000원</span></button>
+      </div>
+
+      <div class="label">선택 품목</div>
+      <ul class="items" id="items"></ul>
+      <div class="empty" id="empty">왼쪽 표에서 수량을 선택하세요</div>
+
+      <div class="row"><span>제품 합계 (<span id="count">0</span>개)</span><span id="subtotal">0원</span></div>
+      <div class="row muted"><span>배송비 (<span id="regionName">서울</span>)</span><span id="shipping">0원</span></div>
+      <div class="total"><span>총 견적 금액</span><b id="total">0원</b></div>
+      <div class="vat">부가세 포함 · 공급가액 <span id="supply">0</span>원 / 부가세 <span id="tax">0</span>원</div>
+
+      <div class="actions">
+        <button id="reset">초기화</button>
+        <button id="print">인쇄</button>
+        <button id="copy" class="primary">견적 복사</button>
+      </div>
+      <div class="toast" id="toast"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  const SHIPPING = { seoul: 0, local: 60000 };
+  const REGION_NAME = { seoul: "서울", local: "지방" };
+  const SIZES = ["싱글", "슈퍼싱글", "퀸", "킹"];
+  const CATEGORIES = [
+    { name: "기본 매트리스", spec: "23cm ~ 25cm", prices: [220000, 242000, 264000, 286000] },
+    { name: "중고가형 매트리스", spec: "28cm ~ 30cm", prices: [253000, 275000, 297000, 319000] },
+    { name: "하단 파운데이션", spec: "", prices: [231000, 253000, 275000, 297000] },
+  ];
+  const MAX_QTY = 999;
+
+  const products = [];
+  CATEGORIES.forEach((c, ci) => c.prices.forEach((p, si) =>
+    products.push({ id: `${ci}-${si}`, cat: c, size: SIZES[si], price: p, qty: 0 })));
+
+  let region = "seoul";
+  const won = n => n.toLocaleString("ko-KR") + "원";
+  const $ = id => document.getElementById(id);
+
+  // build table
+  const tbody = $("tbody");
+  products.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    tr.id = "row-" + p.id;
+    let html = "";
+    if (i % 4 === 0) {
+      html += `<td class="cat" rowspan="4">${p.cat.name}${p.cat.spec ? `<small>${p.cat.spec}</small>` : ""}</td>`;
+    }
+    html += `<td class="size">${p.size}</td>
+      <td class="price">${p.price.toLocaleString("ko-KR")}</td>
+      <td class="qty"><div class="stepper">
+        <button data-act="dec" aria-label="${p.cat.name} ${p.size} 수량 줄이기">−</button>
+        <input type="number" min="0" max="${MAX_QTY}" value="0" inputmode="numeric" aria-label="${p.cat.name} ${p.size} 수량">
+        <button data-act="inc" aria-label="${p.cat.name} ${p.size} 수량 늘리기">+</button>
+      </div></td>
+      <td class="line">-</td>`;
+    tr.innerHTML = html;
+    const input = tr.querySelector("input");
+    const set = v => {
+      v = Math.max(0, Math.min(MAX_QTY, Math.floor(Number(v) || 0)));
+      p.qty = v;
+      render();
+    };
+    tr.querySelector('[data-act="dec"]').onclick = () => set(p.qty - 1);
+    tr.querySelector('[data-act="inc"]').onclick = () => set(p.qty + 1);
+    input.addEventListener("input", () => set(input.value));
+    input.addEventListener("focus", () => input.select());
+    input.addEventListener("blur", () => { input.value = p.qty; });
+    tbody.appendChild(tr);
+  });
+
+  // region toggle
+  $("region").querySelectorAll("button").forEach(b => b.onclick = () => {
+    region = b.dataset.region;
+    $("region").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    render();
+  });
+
+  function calc() {
+    const selected = products.filter(p => p.qty > 0);
+    const count = selected.reduce((s, p) => s + p.qty, 0);
+    const subtotal = selected.reduce((s, p) => s + p.qty * p.price, 0);
+    const shipping = count > 0 ? SHIPPING[region] : 0;
+    const total = subtotal + shipping;
+    const supply = Math.round(total / 1.1);
+    return { selected, count, subtotal, shipping, total, supply, tax: total - supply };
+  }
+
+  function render() {
+    const r = calc();
+    products.forEach(p => {
+      const tr = $("row-" + p.id);
+      const input = tr.querySelector("input");
+      if (document.activeElement !== input || Number(input.value) !== p.qty) {
+        if (!(document.activeElement === input && input.value === "")) input.value = p.qty;
+      }
+      tr.querySelector('[data-act="dec"]').disabled = p.qty === 0;
+      tr.querySelector(".line").textContent = p.qty ? (p.qty * p.price).toLocaleString("ko-KR") : "-";
+      tr.classList.toggle("active", p.qty > 0);
+    });
+
+    $("items").innerHTML = r.selected.map(p =>
+      `<li><span>${p.cat.name} · ${p.size} × ${p.qty}</span><span>${won(p.qty * p.price)}</span></li>`).join("");
+    $("empty").style.display = r.selected.length ? "none" : "block";
+    $("count").textContent = r.count;
+    $("subtotal").textContent = won(r.subtotal);
+    $("regionName").textContent = REGION_NAME[region];
+    $("shipping").textContent = won(r.shipping);
+    $("total").textContent = won(r.total);
+    $("supply").textContent = r.supply.toLocaleString("ko-KR");
+    $("tax").textContent = r.tax.toLocaleString("ko-KR");
+  }
+
+  function toast(msg) {
+    $("toast").textContent = msg;
+    clearTimeout(toast.t);
+    toast.t = setTimeout(() => $("toast").textContent = "", 2200);
+  }
+
+  $("reset").onclick = () => { products.forEach(p => p.qty = 0); render(); toast("초기화했습니다"); };
+  $("print").onclick = () => window.print();
+  $("copy").onclick = async () => {
+    const r = calc();
+    if (!r.count) return toast("먼저 수량을 선택하세요");
+    const today = new Date().toLocaleDateString("ko-KR");
+    const lines = [
+      `[견적서] ${today}`,
+      "",
+      ...r.selected.map(p => `· ${p.cat.name} ${p.size} ${p.price.toLocaleString("ko-KR")}원 × ${p.qty} = ${won(p.qty * p.price)}`),
+      "",
+      `제품 합계 (${r.count}개): ${won(r.subtotal)}`,
+      `배송비 (${REGION_NAME[region]}): ${won(r.shipping)}`,
+      `총 견적 금액: ${won(r.total)} (부가세 포함)`,
+      "",
+      "※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.",
+    ];
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("견적 내용을 복사했습니다");
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove();
+      toast("견적 내용을 복사했습니다");
+    }
+  };
+
+  render();
+</script>
+</body>
+</html>
