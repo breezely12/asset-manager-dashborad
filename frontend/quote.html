@@ -114,6 +114,18 @@
   .chk { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); min-height: 36px; }
   .chk input { width: 20px; height: 20px; accent-color: var(--accent-dark); }
 
+  .modal { position: fixed; inset: 0; z-index: 50; background: rgba(30,24,20,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal[hidden] { display: none; }
+  .sheet { background: var(--paper); border-radius: 14px; width: min(560px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 16px; }
+  .sheet-head button { width: 44px; height: 44px; border: none; background: transparent; font-size: 20px; color: var(--muted); cursor: pointer; }
+  .preview { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .preview img { display: block; width: 100%; height: auto; -webkit-touch-callout: default; }
+  .sheet-hint { font-size: 13px; color: var(--muted); margin: 10px 0; }
+  .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sheet-actions button { min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; }
+  .sheet-actions button.primary { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; font-weight: 700; }
+
   .note { color: var(--muted); font-size: 14px; margin-top: 18px; }
 
   tr.sec { display: none; }
@@ -248,11 +260,24 @@
 
       <div class="actions">
         <button id="reset">초기화</button>
-        <button id="print">인쇄</button>
-        <button id="copy" class="primary">견적 복사</button>
+        <button id="copy">텍스트 복사</button>
+        <button id="exportImg" class="primary">이미지 저장</button>
       </div>
       <div class="toast" id="toast"></div>
     </aside>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="견적서 이미지">
+    <div class="sheet-head"><b>견적서 이미지</b><button id="modalClose" aria-label="닫기">✕</button></div>
+    <div class="preview"><img id="previewImg" alt="견적서 이미지 미리보기"></div>
+    <p class="sheet-hint">휴대폰에서는 이미지를 길게 눌러 저장하거나 공유할 수도 있습니다.</p>
+    <div class="sheet-actions">
+      <button id="imgCopy">이미지 복사</button>
+      <button id="imgSave" class="primary">PNG 저장</button>
+    </div>
+    <div class="toast" id="modalToast"></div>
   </div>
 </div>
 
@@ -498,7 +523,135 @@
     ["bedQ", "bedSS"].forEach(id => { $(id).querySelector("input").value = 0; $(id).querySelector('[data-act="dec"]').disabled = true; });
     $("applied").textContent = "";
     render(); toast("초기화했습니다"); };
-  $("print").onclick = () => window.print();
+
+  // ---------- 이미지 내보내기 ----------
+  let downloads = null;
+  try { window.claude?.use?.("downloads").then(d => { downloads = d; }).catch(() => {}); } catch {}
+
+  function drawQuote() {
+    const r = calc();
+    const S = 2, W = 820, P = 48;
+    const FONT = '"Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+    const cv = document.createElement("canvas");
+    cv.width = W * S; cv.height = 6000 * S;
+    const g = cv.getContext("2d");
+    g.scale(S, S);
+    g.fillStyle = "#fffdf9"; g.fillRect(0, 0, W, 6000);
+    const C = { ink: "#2f2925", muted: "#8a7b6d", line: "#e4dbd0", cat: "#efe6dc", accent: "#a8876a" };
+    const text = (t, x, y, { size = 15, weight = 400, color = C.ink, align = "left", max } = {}) => {
+      g.font = `${weight} ${size}px ${FONT}`; g.fillStyle = color; g.textAlign = align; g.textBaseline = "middle";
+      if (max && g.measureText(t).width > max) { while (t.length > 1 && g.measureText(t + "…").width > max) t = t.slice(0, -1); t += "…"; }
+      g.fillText(t, x, y);
+    };
+    const hline = (y, w = 1, color = C.line) => { g.fillStyle = color; g.fillRect(P, y, W - 2 * P, w); };
+    const colPrice = 548, colQty = 618, colAmt = W - P;
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+
+    let y = P + 18;
+    text("견 적 서", W / 2, y, { size: 34, weight: 800, align: "center" });
+    y += 44;
+    text(dateStr, P, y, { size: 14, color: C.muted });
+    text("단위: 원", W - P, y, { size: 14, color: C.muted, align: "right" });
+    y += 22; hline(y, 3, C.ink); y += 3;
+
+    const header = (title) => {
+      g.fillStyle = C.cat; g.fillRect(P, y, W - 2 * P, 40);
+      text(title, P + 14, y + 20, { size: 15, weight: 700, max: W - 2 * P - 28 });
+      y += 40;
+      text("품목", P + 14, y + 18, { size: 13, color: C.muted });
+      text("단가", colPrice, y + 18, { size: 13, color: C.muted, align: "right" });
+      text("수량", colQty, y + 18, { size: 13, color: C.muted, align: "right" });
+      text("금액", colAmt - 14, y + 18, { size: 13, color: C.muted, align: "right" });
+      y += 36; hline(y);
+    };
+    const item = (name, sub, p) => {
+      const h = sub ? 52 : 40;
+      const my = y + h / 2;
+      text(name, P + 14, sub ? my - 9 : my, { size: 15, max: colPrice - P - 110 });
+      if (sub) text(sub, P + 14, my + 12, { size: 12, color: C.muted, max: colPrice - P - 110 });
+      text(fmt(p.price), colPrice, my, { size: 15, align: "right" });
+      text(fmt(p.qty), colQty, my, { size: 15, align: "right" });
+      text(fmt(p.qty * p.price), colAmt - 14, my, { size: 15, weight: 700, align: "right" });
+      y += h; hline(y);
+    };
+    const sumRow = (a, b, muted) => {
+      text(a, P + 14, y + 17, { size: 14, color: muted ? C.muted : C.ink });
+      text(b, colAmt - 14, y + 17, { size: 14, color: muted ? C.muted : C.ink, weight: muted ? 400 : 700, align: "right" });
+      y += 34;
+    };
+
+    if (r.matCount) {
+      header("매트리스 · 파운데이션  (부가세 포함)");
+      r.mat.forEach(p => item(p.label, "", p));
+      y += 6;
+      sumRow(`소계 (${r.matCount}개)`, won(r.matSubtotal));
+      sumRow(`배송비 (${shipText(r)})`, won(r.shipping), true);
+      y += 14;
+    }
+    if (r.bedCount) {
+      header("침구  (부가세 별도)" + (bedState.used ? `  ·  ${bedBasis()}` : ""));
+      r.bed.forEach(p => item(p.label, `${p.it.size}${p.it.note ? " · " + p.it.note : ""}`, p));
+      y += 6;
+      sumRow(`공급가액 (${r.bedCount}개)`, won(r.bedSupply));
+      sumRow("부가세 10%", won(r.bedVat), true);
+      y += 14;
+    }
+
+    g.fillStyle = C.ink; g.fillRect(P, y, W - 2 * P, 76);
+    text("총 견적 금액", P + 20, y + 38, { size: 17, weight: 700, color: "#fff" });
+    text(won(r.total), W - P - 20, y + 38, { size: 30, weight: 800, color: "#fff", align: "right" });
+    y += 76 + 20;
+    text(`부가세 포함  ·  공급가액 ${won(r.supply)}  /  부가세 ${won(r.tax)}`, W - P, y, { size: 13, color: C.muted, align: "right" });
+    y += 30;
+    if (r.matCount) { text("※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.", P, y, { size: 13, color: C.muted }); y += 26; }
+    y += P - 10;
+
+    const out = document.createElement("canvas");
+    out.width = W * S; out.height = Math.ceil(y * S);
+    out.getContext("2d").drawImage(cv, 0, 0);
+    return out;
+  }
+
+  let lastBlob = null, lastUrl = null;
+  const fileName = () => { const d = new Date(); return `견적서_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}.png`; };
+  function mtoast(msg) { $("modalToast").textContent = msg; clearTimeout(mtoast.t); mtoast.t = setTimeout(() => $("modalToast").textContent = "", 2500); }
+
+  $("exportImg").onclick = () => {
+    if (!calc().count) return toast("먼저 수량을 선택하세요");
+    const cv = drawQuote();
+    cv.toBlob(blob => {
+      lastBlob = blob;
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(blob);
+      $("previewImg").src = lastUrl;
+      $("modal").hidden = false;
+      $("imgSave").focus();
+    }, "image/png");
+  };
+  const closeModal = () => { $("modal").hidden = true; };
+  $("modalClose").onclick = closeModal;
+  $("modal").addEventListener("click", e => { if (e.target === $("modal")) closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("modal").hidden) closeModal(); });
+
+  $("imgSave").onclick = async () => {
+    if (!lastBlob) return;
+    if (downloads) {
+      try { await downloads.save({ filename: fileName(), data: lastBlob }); mtoast("저장했습니다"); }
+      catch (e) { mtoast(e && e.code === "declined" ? "저장을 취소했습니다" : "여기서는 저장할 수 없어요. 이미지를 길게 눌러 저장해 주세요"); }
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = lastUrl; a.download = fileName();
+    document.body.appendChild(a); a.click(); a.remove();
+    mtoast("저장을 시작했습니다. 안 되면 이미지를 길게 눌러 저장해 주세요");
+  };
+  $("imgCopy").onclick = async () => {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": lastBlob })]);
+      mtoast("이미지를 복사했습니다. 카톡·문자에 붙여넣으세요");
+    } catch { mtoast("이 브라우저는 이미지 복사를 지원하지 않아요. PNG 저장을 이용해 주세요"); }
+  };
   $("copy").onclick = async () => {
     const r = calc();
     if (!r.count) return toast("먼저 수량을 선택하세요");
@@ -521,8 +674,6 @@
     toast("견적 내용을 복사했습니다");
   };
 
-  // 인쇄는 iframe(임베드) 안에서 막히는 경우가 많아 숨김
-  if (window.self !== window.top) { $("print").remove(); document.querySelector(".actions").style.gridTemplateColumns = "1fr 1fr"; }
 
   render();
 }
