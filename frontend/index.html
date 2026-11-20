@@ -85,6 +85,20 @@
       <h2>자산 목록</h2>
       <button id="addHoldingBtn" class="btn btn-primary">+ 자산 추가</button>
     </div>
+
+    <div class="yearly-summary-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="yearly-bar-card">
+        <div class="yearly-bar-pill" id="holdingsValuePill">총 평가금액 -</div>
+        <div class="yearly-bar-avg" id="holdingsCountLabel"></div>
+        <div class="yearly-hbar-list" id="holdingsValueBars"></div>
+      </div>
+      <div class="yearly-bar-card">
+        <div class="yearly-bar-pill" id="holdingsGainPill">총 손익 -</div>
+        <div class="yearly-bar-avg">매입 원가가 있는 자산 기준</div>
+        <div class="yearly-hbar-list" id="holdingsGainBars"></div>
+      </div>
+    </div>
+
     <table class="data-table" id="holdingsTable">
       <thead>
         <tr>

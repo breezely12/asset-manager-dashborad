@@ -362,8 +362,50 @@ async function loadOverview() {
 }
 
 // ---------- holdings ----------
+function renderSignedHBarList(containerId, items) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  if (items.length === 0) {
+    container.innerHTML = `<div class="muted">데이터 없음</div>`;
+    return;
+  }
+  const maxV = Math.max(...items.map(([, v]) => Math.abs(v)), 1);
+  items.forEach(([label, value]) => {
+    const pctOfMax = (Math.abs(value) / maxV * 100).toFixed(1);
+    const fillColor = value >= 0 ? cssVar("--good") : cssVar("--critical");
+    const row = document.createElement("div");
+    row.className = "yearly-hbar-row";
+    row.innerHTML = `
+      <div class="yearly-hbar-label">${label}</div>
+      <div class="yearly-hbar-track"><div class="yearly-hbar-fill" style="width:${pctOfMax}%;background:${fillColor}"></div></div>
+      <div class="yearly-hbar-value">${fmtSignedMillions(value)}</div>
+    `;
+    container.appendChild(row);
+  });
+}
+
 async function loadHoldings() {
   const data = await api("/holdings");
+
+  const valueTotals = {};
+  let gainTotal = 0;
+  const gainTotals = {};
+  data.holdings.forEach((h) => {
+    const label = CATEGORY_LABEL[h.category] || h.category;
+    valueTotals[label] = (valueTotals[label] || 0) + (h.value_krw || 0);
+    if (h.gain_krw != null) {
+      gainTotals[label] = (gainTotals[label] || 0) + h.gain_krw;
+      gainTotal += h.gain_krw;
+    }
+  });
+  const totalValue = data.holdings.reduce((s, h) => s + (h.value_krw || 0), 0);
+  document.getElementById("holdingsValuePill").textContent = `총 평가금액 ${fmtMillions(totalValue)}`;
+  document.getElementById("holdingsCountLabel").textContent = `보유 자산 ${data.holdings.length}건`;
+  renderHBarList("holdingsValueBars", Object.entries(valueTotals).sort((a, b) => b[1] - a[1]), totalValue);
+
+  document.getElementById("holdingsGainPill").textContent = `총 손익 ${fmtSignedMillions(gainTotal)}`;
+  renderSignedHBarList("holdingsGainBars", Object.entries(gainTotals).sort((a, b) => b[1] - a[1]));
+
   const tbody = document.querySelector("#holdingsTable tbody");
   tbody.innerHTML = "";
   data.holdings.forEach((h) => {
