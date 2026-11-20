@@ -99,26 +99,30 @@
       </div>
     </div>
 
-    <table class="data-table" id="holdingsTable">
-      <thead>
-        <tr>
-          <th>구분</th><th>이름</th><th>수량</th><th>평균 매입가</th>
-          <th>현재가</th><th>평가금액(백만원)</th><th>손익</th><th></th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="data-table" id="holdingsTable">
+        <thead>
+          <tr>
+            <th>구분</th><th>이름</th><th>수량</th><th>평균 매입가</th>
+            <th>현재가</th><th>평가금액(백만원)</th><th>손익</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
     <div class="panel-header" style="margin-top:28px;">
       <h2>부채 목록</h2>
       <button id="addLiabilityBtn" class="btn btn-primary">+ 부채 추가</button>
     </div>
-    <table class="data-table" id="liabilitiesTable">
-      <thead>
-        <tr><th>이름</th><th>메모</th><th>잔액(KRW)</th><th></th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="data-table" id="liabilitiesTable">
+        <thead>
+          <tr><th>이름</th><th>메모</th><th>잔액(KRW)</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
   <!-- LEDGER -->
@@ -190,21 +194,23 @@
       <button type="button" id="txFilterReset" class="btn btn-secondary btn-small">필터 초기화</button>
     </div>
 
-    <table class="data-table" id="txTable">
-      <thead>
-        <tr>
-          <th class="sortable" data-sort="date">날짜 <span class="sort-arrow"></span></th>
-          <th class="sortable" data-sort="type">구분 <span class="sort-arrow"></span></th>
-          <th class="sortable" data-sort="major">대분류 <span class="sort-arrow"></span></th>
-          <th class="sortable" data-sort="minor">소분류 <span class="sort-arrow"></span></th>
-          <th class="sortable" data-sort="payment_method">결제수단 <span class="sort-arrow"></span></th>
-          <th class="sortable" data-sort="amount">금액 <span class="sort-arrow"></span></th>
-          <th>메모</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="data-table" id="txTable">
+        <thead>
+          <tr>
+            <th class="sortable" data-sort="date">날짜 <span class="sort-arrow"></span></th>
+            <th class="sortable" data-sort="type">구분 <span class="sort-arrow"></span></th>
+            <th class="sortable" data-sort="major">대분류 <span class="sort-arrow"></span></th>
+            <th class="sortable" data-sort="minor">소분류 <span class="sort-arrow"></span></th>
+            <th class="sortable" data-sort="payment_method">결제수단 <span class="sort-arrow"></span></th>
+            <th class="sortable" data-sort="amount">금액 <span class="sort-arrow"></span></th>
+            <th>메모</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
   <!-- YEARLY -->
@@ -303,12 +309,14 @@
       </table>
     </div>
 
-    <table class="data-table" id="investmentTable">
-      <thead>
-        <tr><th>날짜</th><th>구분</th><th>카테고리</th><th>금액</th><th>메모</th><th></th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="data-table" id="investmentTable">
+        <thead>
+          <tr><th>날짜</th><th>구분</th><th>카테고리</th><th>금액</th><th>메모</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
 <!-- Holding modal -->

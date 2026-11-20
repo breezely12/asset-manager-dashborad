@@ -85,7 +85,7 @@ function renderDonut(svgId, legendId, segments, options = {}) {
     empty.setAttribute("stroke", cssVar("--gridline"));
     empty.setAttribute("stroke-width", strokeWidth);
     svg.appendChild(empty);
-    legend.innerHTML = `<li class="muted">데이터 없음</li>`;
+    legend.innerHTML = `<li class="empty-state">데이터 없음</li>`;
     return;
   }
 
@@ -368,7 +368,7 @@ function renderSignedHBarList(containerId, items) {
   if (!container) return;
   container.innerHTML = "";
   if (items.length === 0) {
-    container.innerHTML = `<div class="muted">데이터 없음</div>`;
+    container.innerHTML = `<div class="empty-state">데이터 없음</div>`;
     return;
   }
   const maxV = Math.max(...items.map(([, v]) => Math.abs(v)), 1);
@@ -739,6 +739,11 @@ function renderTxTable() {
   const activeHeader = document.querySelector(`#txTable th.sortable[data-sort="${txSort.col}"] .sort-arrow`);
   if (activeHeader) activeHeader.textContent = txSort.dir === "asc" ? "▲" : "▼";
 
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="text-align:center">${currentLedgerTxs.length === 0 ? "이번 달 내역이 없습니다" : "조건에 맞는 내역이 없습니다"}</td></tr>`;
+    return;
+  }
+
   rows.forEach((t) => {
     const tr = document.createElement("tr");
     if (!t.count_in_total) tr.className = "muted";
@@ -1039,6 +1044,10 @@ function renderHBarList(containerId, majorTotalsList, base, limit) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = "";
+  if (majorTotalsList.length === 0) {
+    container.innerHTML = `<div class="empty-state">데이터 없음</div>`;
+    return;
+  }
   const list = limit ? majorTotalsList.slice(0, limit) : majorTotalsList;
   const maxV = Math.max(...list.map(([, v]) => v), 1);
   list.forEach(([label, value]) => {
