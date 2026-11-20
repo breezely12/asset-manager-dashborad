@@ -89,20 +89,13 @@ function renderDonut(svgId, legendId, segments, options = {}) {
     return;
   }
 
-  const visibleSegments = segments.filter((s) => s.value > 0);
-  const tonalColor = (i, n) => {
-    if (n <= 1) return `color-mix(in srgb, var(${options.tonalBase}) 70%, white)`;
-    const pct = 92 - (i / (n - 1)) * 68; // darkest/most saturated first, fading lighter
-    return `color-mix(in srgb, var(${options.tonalBase}) ${pct.toFixed(0)}%, white)`;
-  };
-
   let cumulativeDeg = -90;
-  visibleSegments.forEach((seg, i) => {
+  segments.filter((s) => s.value > 0).forEach((seg) => {
     const fraction = seg.value / total;
     const segDeg = fraction * 360;
     const drawDeg = Math.max(segDeg - gapDeg, 0.5);
     const dash = (drawDeg / 360) * circumference;
-    const color = options.tonalBase ? tonalColor(i, visibleSegments.length) : cssVar(seg.colorVar);
+    const color = cssVar(seg.colorVar);
 
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", cx); circle.setAttribute("cy", cy); circle.setAttribute("r", r);
@@ -598,9 +591,10 @@ async function loadLedger() {
   ]);
 
   const categories = Object.entries(txSummary.by_category).sort((a, b) => b[1] - a[1]);
+  const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-6", "--series-7", "--series-8"];
   renderDonut("expenseChart", "expenseLegend",
-    categories.map(([label, value]) => ({ label, value })),
-    { minPct: 2, tonalBase: "--series-8" }
+    categories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] })),
+    { minPct: 2 }
   );
 
   const fillCategoryBox = (tbodyId, byCategory, base) => {
