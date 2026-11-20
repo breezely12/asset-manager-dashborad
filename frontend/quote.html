@@ -153,7 +153,7 @@
       <div class="label">배송 지역</div>
       <div class="seg" id="region">
         <button data-region="seoul" class="on">서울<span>배송비 무료</span></button>
-        <button data-region="local">지방<span>배송비 60,000원</span></button>
+        <button data-region="local">지방<span>개당 60,000원</span></button>
       </div>
 
       <div class="label">선택 품목</div>
@@ -161,7 +161,7 @@
       <div class="empty" id="empty">왼쪽 표에서 수량을 선택하세요</div>
 
       <div class="row"><span>제품 합계 (<span id="count">0</span>개)</span><span id="subtotal">0원</span></div>
-      <div class="row muted"><span>배송비 (<span id="regionName">서울</span>)</span><span id="shipping">0원</span></div>
+      <div class="row muted"><span>배송비 (<span id="regionName">서울</span><span id="shipDetail"></span>)</span><span id="shipping">0원</span></div>
       <div class="total"><span>총 견적 금액</span><b id="total">0원</b></div>
       <div class="vat">부가세 포함 · 공급가액 <span id="supply">0</span>원 / 부가세 <span id="tax">0</span>원</div>
 
@@ -246,7 +246,7 @@
     const selected = products.filter(p => p.qty > 0);
     const count = selected.reduce((s, p) => s + p.qty, 0);
     const subtotal = selected.reduce((s, p) => s + p.qty * p.price, 0);
-    const shipping = count > 0 ? SHIPPING[region] : 0;
+    const shipping = count * SHIPPING[region];
     const total = subtotal + shipping;
     const supply = Math.round(total / 1.1);
     return { selected, count, subtotal, shipping, total, supply, tax: total - supply };
@@ -272,6 +272,7 @@
     $("subtotal").textContent = won(r.subtotal);
     $("regionName").textContent = REGION_NAME[region];
     $("shipping").textContent = won(r.shipping);
+    $("shipDetail").textContent = SHIPPING[region] && r.count ? ` · ${SHIPPING[region].toLocaleString("ko-KR")}원 × ${r.count}개` : "";
     $("total").textContent = won(r.total);
     $("supply").textContent = r.supply.toLocaleString("ko-KR");
     $("mbarInfo").textContent = `${r.count}개 · ${REGION_NAME[region]} 배송${r.shipping ? " +" + r.shipping.toLocaleString("ko-KR") : ""}`;
@@ -298,7 +299,7 @@
       ...r.selected.map(p => `· ${p.cat.name} ${p.size} ${p.price.toLocaleString("ko-KR")}원 × ${p.qty} = ${won(p.qty * p.price)}`),
       "",
       `제품 합계 (${r.count}개): ${won(r.subtotal)}`,
-      `배송비 (${REGION_NAME[region]}): ${won(r.shipping)}`,
+      `배송비 (${REGION_NAME[region]}${SHIPPING[region] ? ` · ${SHIPPING[region].toLocaleString("ko-KR")}원 × ${r.count}개` : ""}): ${won(r.shipping)}`,
       `총 견적 금액: ${won(r.total)} (부가세 포함)`,
       "",
       "※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.",
