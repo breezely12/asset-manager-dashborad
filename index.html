@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f2ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="에이치런 견적계산서">
+<meta name="format-detection" content="telephone=no">
+<title>에이치런 견적계산서</title>
+<style>
+  :root {
+    --bg: #f6f2ec;
+    --paper: #fffdf9;
+    --cat: #efe6dc;
+    --ink: #2f2925;
+    --muted: #8a7b6d;
+    --line: #e4dbd0;
+    --accent: #a8876a;
+    --accent-dark: #7d6249;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 48px 24px 64px; }
+  h1 { font-size: 36px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
+  .bar { width: 48px; height: 3px; background: var(--accent); margin: 20px 0 14px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 32px; }
+
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 28px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; background: var(--paper); border-top: 3px solid var(--ink); border-bottom: 3px solid var(--ink); }
+  th { font-weight: 500; color: var(--muted); font-size: 14px; padding: 16px 12px; border-bottom: 1.5px solid var(--ink); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  tr:last-child td { border-bottom: none; }
+  td.cat { background: var(--cat); text-align: center; font-weight: 700; border-bottom: 1px solid #d6c8b8; width: 24%; }
+  td.cat small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  td.size { text-align: center; width: 16%; }
+  td.price { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; width: 18%; }
+  td.qty { text-align: center; width: 22%; }
+  td.line { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); width: 20%; }
+  tr.active td:not(.cat) { background: #fbf4ea; }
+  tr.active td.line { color: var(--ink); font-weight: 700; }
+
+  .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+  .stepper button { width: 34px; height: 34px; border: none; background: transparent; font-size: 18px; color: var(--accent-dark); cursor: pointer; }
+  .stepper button:hover { background: var(--cat); }
+  .stepper button:disabled { color: #cfc4b8; cursor: default; background: transparent; }
+  .stepper input { width: 46px; height: 34px; border: none; border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center; font-size: 15px; font-family: inherit; color: var(--ink); -moz-appearance: textfield; }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .stepper input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .card { background: var(--paper); border-top: 3px solid var(--ink); border-bottom: 3px solid var(--ink); padding: 22px 22px 24px; position: sticky; top: 20px; }
+  .card h2 { font-size: 18px; margin: 0 0 16px; }
+  .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+  .seg button { border: none; background: #fff; padding: 12px 8px; font-family: inherit; font-size: 15px; color: var(--muted); cursor: pointer; line-height: 1.3; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--ink); color: #fff; font-weight: 700; }
+  .seg button span { display: block; font-size: 12px; font-weight: 400; opacity: .8; }
+
+  .items { list-style: none; margin: 0 0 14px; padding: 0; max-height: 260px; overflow: auto; }
+  .items li.sumhead { display: block; border: none; padding: 10px 0 2px; }
+  .items li { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  .items li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .empty { color: var(--muted); font-size: 14px; padding: 18px 0; text-align: center; border-bottom: 1px dashed var(--line); margin-bottom: 14px; }
+  .row { display: flex; justify-content: space-between; font-size: 15px; padding: 5px 0; font-variant-numeric: tabular-nums; }
+  .row.muted { color: var(--muted); }
+  .total { display: flex; justify-content: space-between; align-items: baseline; border-top: 1.5px solid var(--ink); margin-top: 10px; padding-top: 14px; }
+  .total b { font-size: 28px; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+  .total span { font-size: 15px; font-weight: 700; }
+  .vat { text-align: right; font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 20px; }
+  .actions button { padding: 11px 6px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-family: inherit; font-size: 14px; color: var(--ink); cursor: pointer; }
+  .actions button.primary { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; font-weight: 700; }
+  .actions button:hover { filter: brightness(.96); }
+  .toast { margin-top: 10px; font-size: 13px; color: var(--accent-dark); text-align: center; min-height: 18px; }
+
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tabs button { flex: 1; min-height: 48px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-family: inherit; font-size: 16px; color: var(--muted); cursor: pointer; }
+  .tabs button.on { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700; }
+  .tabs button em { font-style: normal; font-size: 12px; margin-left: 6px; padding: 2px 7px; border-radius: 99px; background: var(--accent); color: #fff; font-weight: 700; }
+  .tabs button em:empty { display: none; }
+  .pane[hidden] { display: none; }
+  tr.grp td { background: var(--cat); font-weight: 700; padding: 11px 14px; border-bottom: 1px solid #d6c8b8; }
+  td.item { text-align: left; padding-left: 16px; }
+  td.item small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .sumhead { font-size: 13px; color: var(--muted); margin: 10px 0 2px; font-weight: 700; }
+  .sumhead:first-child { margin-top: 0; }
+
+  .beds { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 14px; margin-bottom: 16px; }
+  .beds h3 { margin: 0 0 4px; font-size: 16px; }
+  .beds .hint { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+  .bedgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: end; }
+  .bedgrid .label { margin-bottom: 6px; }
+  .bedgrid .seg { margin: 0; grid-template-columns: repeat(4, 1fr); }
+  .bedgrid .seg button { padding: 9px 4px; min-height: 36px; }
+  .beds details { margin-top: 12px; font-size: 14px; }
+  .beds summary { cursor: pointer; color: var(--accent-dark); padding: 6px 0; }
+  .recipe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 8px 0 6px; }
+  .recipe label { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+  .recipe input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--ink); background: #fff; width: 100%; }
+  .recipe-note { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 6px 0 0; }
+  .applied { margin-top: 10px; font-size: 13px; color: var(--accent-dark); min-height: 18px; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); min-height: 36px; }
+  .chk input { width: 20px; height: 20px; accent-color: var(--accent-dark); }
+
+  .modal { position: fixed; inset: 0; z-index: 50; background: rgba(30,24,20,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal[hidden] { display: none; }
+  .sheet { background: var(--paper); border-radius: 14px; width: min(560px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 16px; }
+  .sheet-head button { width: 44px; height: 44px; border: none; background: transparent; font-size: 20px; color: var(--muted); cursor: pointer; }
+  .preview { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .preview img { display: block; width: 100%; height: auto; -webkit-touch-callout: default; }
+  .sheet-hint { font-size: 13px; color: var(--muted); margin: 10px 0; }
+  .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sheet-actions button { min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; }
+  .sheet-actions button.primary { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; font-weight: 700; }
+
+  .note { color: var(--muted); font-size: 14px; margin-top: 18px; }
+
+  tr.sec { display: none; }
+  .mbar { display: none; }
+  html { -webkit-text-size-adjust: 100%; }
+  button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+  @media (max-width: 900px) {
+    .card { position: static; }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: calc(28px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(110px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+    h1 { font-size: 28px; }
+    .sub { margin-bottom: 20px; }
+    th.cat-h, td.cat { display: none; }
+    tr.sec { display: table-row; }
+    tr.sec td { background: var(--cat); font-weight: 700; padding: 12px 14px; border-bottom: 1px solid #d6c8b8; }
+    tr.sec td small { font-weight: 400; color: var(--muted); margin-left: 6px; font-size: 13px; }
+    td, th { padding: 8px 8px; font-size: 15px; }
+    th.line, td.line { display: none; }
+    td.size { text-align: left; padding-left: 14px; width: auto; }
+    td.price { width: auto; }
+    td.qty { width: 1%; white-space: nowrap; padding-right: 10px; }
+    .stepper button { width: 44px; height: 44px; font-size: 22px; }
+    .stepper input { width: 46px; height: 44px; font-size: 16px; }
+    .seg button { padding: 14px 8px; font-size: 16px; }
+    .actions button { padding: 14px 6px; font-size: 15px; }
+    .items { max-height: none; }
+    td.item { padding-left: 12px; }
+    .tabs button { font-size: 15px; }
+    .bedgrid { grid-template-columns: 1fr 1fr; }
+    .bedgrid .mult { grid-column: 1 / -1; }
+    .bedgrid .seg button { min-height: 44px; font-size: 15px; }
+    .recipe { grid-template-columns: 1fr 1fr; }
+    .mbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+      padding: 12px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      background: var(--ink); color: #fff; box-shadow: 0 -4px 16px rgba(0,0,0,.12);
+    }
+    .mbar .mt { font-size: 12px; opacity: .75; }
+    .mbar b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
+    .mbar button { flex: none; border: none; border-radius: 10px; background: var(--accent); color: #fff; font: 700 15px/1 inherit; font-family: inherit; padding: 14px 16px; min-height: 44px; }
+  }
+  @media print {
+    body { background: #fff; }
+    .stepper button, .actions, .toast, .seg button:not(.on) { display: none; }
+    .seg { grid-template-columns: 1fr; border: none; }
+    .card { position: static; }
+    .layout { grid-template-columns: 1fr; }
+    tr:not(.active) td:not(.cat) { color: #bbb; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>에이치런 견적계산서</h1>
+  <div class="bar"></div>
+  <p class="sub">단위: 원 · 수량을 입력하면 견적이 바로 계산됩니다 · 두 탭의 품목이 한 견적으로 합산됩니다</p>
+
+  <div class="layout">
+    <div>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="mat" class="on">매트리스·파운데이션<em id="badge-mat"></em></button>
+        <button role="tab" data-tab="bed">침구<em id="badge-bed"></em></button>
+      </div>
+
+      <section class="pane" id="pane-mat">
+        <table>
+          <thead>
+            <tr><th class="cat-h">구분</th><th>사이즈</th><th>단가</th><th>수량</th><th class="line">금액</th></tr>
+          </thead>
+          <tbody id="tbody-mat"></tbody>
+        </table>
+        <p class="note">※ 단가 부가세 포함 · 서울 배송 무료, 지방 개당 60,000원<br>※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.</p>
+      </section>
+
+      <section class="pane" id="pane-bed" hidden>
+        <div class="beds">
+          <h3>침대 수로 자동 계산 <small style="font-weight:400;color:var(--muted)">(선택)</small></h3>
+          <p class="hint">침대 수와 교체 배수를 넣으면 아래 수량이 자동으로 채워집니다. 채운 뒤 개별 수량을 직접 고쳐도 됩니다.</p>
+          <div class="bedgrid">
+            <div><div class="label">퀸 (Q) 침대</div>
+              <div class="stepper" id="bedQ"><button data-act="dec" aria-label="퀸 침대 수 줄이기">−</button><input type="number" min="0" max="999" value="0" inputmode="numeric" aria-label="퀸 침대 수"><button data-act="inc" aria-label="퀸 침대 수 늘리기">+</button></div></div>
+            <div><div class="label">슈퍼싱글 (SS) 침대</div>
+              <div class="stepper" id="bedSS"><button data-act="dec" aria-label="슈퍼싱글 침대 수 줄이기">−</button><input type="number" min="0" max="999" value="0" inputmode="numeric" aria-label="슈퍼싱글 침대 수"><button data-act="inc" aria-label="슈퍼싱글 침대 수 늘리기">+</button></div></div>
+            <div class="mult"><div class="label">교체 배수 (커버류)</div>
+              <div class="seg" id="mult">
+                <button data-m="1">1배수</button><button data-m="2">2배수</button><button data-m="3" class="on">3배수</button><button data-m="4">4배수</button>
+              </div></div>
+          </div>
+          <label class="chk"><input type="checkbox" id="towelOn" checked> 타올 포함</label>
+          <details>
+            <summary>구성 기준 보기 · 변경</summary>
+            <div class="recipe">
+              <label>퀸 침대당 베개<input type="number" min="0" id="pillowQ" value="2" inputmode="numeric"></label>
+              <label>SS 침대당 베개<input type="number" min="0" id="pillowSS" value="1" inputmode="numeric"></label>
+              <label>1인당 세면타올<input type="number" min="0" id="towelF" value="2" inputmode="numeric"></label>
+              <label>1인당 바스타올<input type="number" min="0" id="towelB" value="1" inputmode="numeric"></label>
+            </div>
+            <p class="recipe-note">침대 1대당 · 방수 매트리스커버 1 · 이불솜 1 · 베개솜과 방수베개커버는 베개 수만큼<br>
+              교체 배수 적용 · 홑겹 매트리스커버 1 · 이불커버 1 · 캥거루 베개커버는 베개 수 × 배수<br>
+              타올 · 베개 1개 = 1인으로 보고, 1인당 개수 × 배수 · 퀸은 Q 품목, 슈퍼싱글은 SS·80 품목</p>
+          </details>
+          <div class="applied" id="applied"></div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>품목</th><th>단가</th><th>수량</th><th class="line">공급가액</th></tr>
+          </thead>
+          <tbody id="tbody-bed"></tbody>
+        </table>
+        <p class="note">※ 침구 단가는 부가세 별도이며, 합계에 부가세 10%가 더해집니다 · 침구는 배송비가 없습니다.</p>
+      </section>
+    </div>
+
+    <aside class="card">
+      <h2>견적 요약</h2>
+      <div class="label">배송 지역 (매트리스·파운데이션만 해당 · 침구는 배송비 없음)</div>
+      <div class="seg" id="region">
+        <button data-region="seoul" class="on">서울<span>배송비 무료</span></button>
+        <button data-region="local">지방<span>개당 60,000원</span></button>
+      </div>
+
+      <div class="label">선택 품목</div>
+      <ul class="items" id="items"></ul>
+      <div class="empty" id="empty">왼쪽 표에서 수량을 선택하세요</div>
+
+      <div id="sumRows"></div>
+      <div class="total"><span>총 견적 금액</span><b id="total">0원</b></div>
+      <div class="vat">부가세 포함 · 공급가액 <span id="supply">0</span>원 / 부가세 <span id="tax">0</span>원</div>
+
+      <div class="actions">
+        <button id="reset">초기화</button>
+        <button id="copy">텍스트 복사</button>
+        <button id="exportImg" class="primary">이미지 저장</button>
+      </div>
+      <div class="toast" id="toast"></div>
+    </aside>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="견적서 이미지">
+    <div class="sheet-head"><b>견적서 이미지</b><button id="modalClose" aria-label="닫기">✕</button></div>
+    <div class="preview"><img id="previewImg" alt="견적서 이미지 미리보기"></div>
+    <p class="sheet-hint">휴대폰에서는 이미지를 길게 눌러 저장하거나 공유할 수도 있습니다.</p>
+    <div class="sheet-actions">
+      <button id="imgCopy">이미지 복사</button>
+      <button id="imgSave" class="primary">PNG 저장</button>
+    </div>
+    <div class="toast" id="modalToast"></div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar">
+  <div><span class="mt" id="mbarInfo">0개</span><b id="mbarTotal">0원</b></div>
+  <button id="mbarBtn">견적 보기</button>
+</div>
+
+<script>
+{
+  const SHIPPING = { seoul: 0, local: 60000 };
+  const REGION_NAME = { seoul: "서울", local: "지방" };
+  const MAX_QTY = 999;
+
+  // 매트리스·파운데이션: 부가세 포함 단가
+  const SIZES = ["싱글", "슈퍼싱글", "퀸", "킹"];
+  const MAT = [
+    { name: "기본 매트리스", spec: "23cm ~ 25cm", prices: [220000, 242000, 264000, 286000] },
+    { name: "중고가형 매트리스", spec: "28cm ~ 30cm", prices: [253000, 275000, 297000, 319000] },
+    { name: "하단 파운데이션", spec: "", prices: [231000, 253000, 275000, 297000] },
+  ];
+
+  // 침구: 부가세 별도 단가 (공급가)
+  const BED = [
+    { group: "매트리스커버", items: [
+      { name: "방수 매트리스커버 Q", size: "150×200", price: 22000 },
+      { name: "방수 매트리스커버 80", size: "80×200", price: 22000 },
+      { name: "홑겹 매트리스커버 Q", size: "150×200", price: 19800 },
+      { name: "홑겹 매트리스커버 80", size: "80×200", price: 18000 },
+    ]},
+    { group: "이불", items: [
+      { name: "최고급 마이크로화이버 이불솜 Q", size: "200×230", price: 71000, note: "특급호텔납품용" },
+      { name: "최고급 마이크로화이버 이불솜 SS", size: "160×210", price: 61000, note: "특급호텔납품용" },
+      { name: "홑겹 이불커버 Q (솜창구)", size: "200×230", price: 30000 },
+      { name: "홑겹 이불커버 SS (솜창구)", size: "160×210", price: 29000 },
+    ]},
+    { group: "베개", items: [
+      { name: "최고급 마이크로화이버 베개솜", size: "50×70", price: 13500, note: "특급호텔납품용" },
+      { name: "매쉬 방수베개커버", size: "50×70", price: 5000, note: "통풍구처리" },
+      { name: "캥거루 베개커버", size: "50×70", price: 3500, note: "편지봉투형" },
+    ]},
+    { group: "타올", items: [
+      { name: "A 세면타올 (무지)", size: "40×80", price: 2500, note: "150g" },
+      { name: "A 바스타올 (격자)", size: "65×130", price: 7200, note: "430g" },
+    ]},
+  ];
+
+  const products = [];
+  MAT.forEach((c, ci) => c.prices.forEach((price, si) => products.push({
+    id: `m${ci}-${si}`, tab: "mat", group: c, label: `${c.name} · ${SIZES[si]}`, size: SIZES[si], price, qty: 0 })));
+  BED.forEach((g, gi) => g.items.forEach((it, ii) => products.push({
+    id: `b${gi}-${ii}`, tab: "bed", label: it.name, it, price: it.price, qty: 0 })));
+
+  let region = "seoul";
+  const fmt = n => n.toLocaleString("ko-KR");
+  const won = n => fmt(n) + "원";
+  const $ = id => document.getElementById(id);
+
+  const stepper = p => `<div class="stepper">
+      <button data-act="dec" aria-label="${p.label} 수량 줄이기">−</button>
+      <input type="number" min="0" max="${MAX_QTY}" value="0" inputmode="numeric" aria-label="${p.label} 수량">
+      <button data-act="inc" aria-label="${p.label} 수량 늘리기">+</button>
+    </div>`;
+
+  function bindRow(tr, p) {
+    const input = tr.querySelector("input");
+    const set = v => { p.qty = Math.max(0, Math.min(MAX_QTY, Math.floor(Number(v) || 0))); render(); };
+    tr.querySelector('[data-act="dec"]').onclick = () => set(p.qty - 1);
+    tr.querySelector('[data-act="inc"]').onclick = () => set(p.qty + 1);
+    input.addEventListener("input", () => set(input.value));
+    input.addEventListener("focus", () => input.select());
+    input.addEventListener("blur", () => { input.value = p.qty; });
+  }
+
+  // 매트리스 표
+  const tbMat = $("tbody-mat");
+  products.filter(p => p.tab === "mat").forEach((p, i) => {
+    const c = p.group, catHtml = `${c.name}${c.spec ? `<small>${c.spec}</small>` : ""}`;
+    if (i % 4 === 0) {
+      const sec = document.createElement("tr");
+      sec.className = "sec";
+      sec.innerHTML = `<td colspan="4">${catHtml}</td>`;
+      tbMat.appendChild(sec);
+    }
+    const tr = document.createElement("tr");
+    tr.id = "row-" + p.id;
+    tr.innerHTML = (i % 4 === 0 ? `<td class="cat" rowspan="4">${catHtml}</td>` : "") +
+      `<td class="size">${p.size}</td><td class="price">${fmt(p.price)}</td>
+       <td class="qty">${stepper(p)}</td><td class="line">-</td>`;
+    bindRow(tr, p);
+    tbMat.appendChild(tr);
+  });
+
+  // 침구 표
+  const tbBed = $("tbody-bed");
+  BED.forEach((g, gi) => {
+    const grp = document.createElement("tr");
+    grp.className = "grp";
+    grp.innerHTML = `<td colspan="4">${g.group}</td>`;
+    tbBed.appendChild(grp);
+    products.filter(p => p.id.startsWith(`b${gi}-`)).forEach(p => {
+      const tr = document.createElement("tr");
+      tr.id = "row-" + p.id;
+      tr.innerHTML = `<td class="item">${p.it.name}<small>${p.it.size}${p.it.note ? " · " + p.it.note : ""}</small></td>
+        <td class="price">${fmt(p.price)}</td><td class="qty">${stepper(p)}</td><td class="line">-</td>`;
+      bindRow(tr, p);
+      tbBed.appendChild(tr);
+    });
+  });
+
+  // 침대 수 자동 계산
+  const bedState = { q: 0, ss: 0, m: 3, used: false };
+  const num = id => Math.max(0, Math.floor(Number($(id).value) || 0));
+  const prod = id => products.find(p => p.id === id);
+  function applyBeds() {
+    const { q, ss, m } = bedState;
+    const pq = num("pillowQ"), pss = num("pillowSS");
+    const pillows = q * pq + ss * pss;
+    const towels = $("towelOn").checked;
+    const plan = {
+      "b0-0": q, "b0-1": ss,                 // 방수 매트리스커버
+      "b0-2": q * m, "b0-3": ss * m,         // 홑겹 매트리스커버
+      "b1-0": q, "b1-1": ss,                 // 이불솜
+      "b1-2": q * m, "b1-3": ss * m,         // 이불커버
+      "b2-0": pillows, "b2-1": pillows,      // 베개솜, 방수베개커버
+      "b2-2": pillows * m,                   // 캥거루 베개커버
+      "b3-0": towels ? pillows * num("towelF") * m : 0,
+      "b3-1": towels ? pillows * num("towelB") * m : 0,
+    };
+    Object.entries(plan).forEach(([id, v]) => prod(id).qty = Math.min(MAX_QTY, v));
+    bedState.used = q + ss > 0;
+    $("applied").textContent = bedState.used ? `✓ ${bedBasis()} 기준으로 수량을 채웠습니다` : "";
+    render();
+  }
+  const bedBasis = () => [bedState.q && `퀸 ${bedState.q}대`, bedState.ss && `슈퍼싱글 ${bedState.ss}대`].filter(Boolean).join(" · ") + ` · ${bedState.m}배수`;
+  [["bedQ", "q"], ["bedSS", "ss"]].forEach(([id, key]) => {
+    const el = $(id), input = el.querySelector("input");
+    const set = v => {
+      bedState[key] = Math.max(0, Math.min(999, Math.floor(Number(v) || 0)));
+      if (!(document.activeElement === input && input.value === "")) input.value = bedState[key];
+      el.querySelector('[data-act="dec"]').disabled = bedState[key] === 0;
+      applyBeds();
+    };
+    el.querySelector('[data-act="dec"]').onclick = () => set(bedState[key] - 1);
+    el.querySelector('[data-act="inc"]').onclick = () => set(bedState[key] + 1);
+    el.querySelector('[data-act="dec"]').disabled = true;
+    input.addEventListener("input", () => set(input.value));
+    input.addEventListener("focus", () => input.select());
+    input.addEventListener("blur", () => { input.value = bedState[key]; });
+  });
+  $("mult").querySelectorAll("button").forEach(b => b.onclick = () => {
+    bedState.m = Number(b.dataset.m);
+    $("mult").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    if (bedState.q + bedState.ss) applyBeds();
+  });
+  ["pillowQ", "pillowSS", "towelF", "towelB", "towelOn"].forEach(id =>
+    $(id).addEventListener(id === "towelOn" ? "change" : "input", () => { if (bedState.q + bedState.ss) applyBeds(); }));
+
+  // 탭
+  const tabBtns = document.querySelectorAll(".tabs button");
+  function showTab(t) {
+    tabBtns.forEach(b => { b.classList.toggle("on", b.dataset.tab === t); b.setAttribute("aria-selected", b.dataset.tab === t); });
+    $("pane-mat").hidden = t !== "mat";
+    $("pane-bed").hidden = t !== "bed";
+  }
+  tabBtns.forEach(b => b.onclick = () => {
+    showTab(b.dataset.tab);
+    try { history.replaceState(null, "", b.dataset.tab === "bed" ? "#bedding" : location.pathname + location.search); } catch {}
+  });
+  if (location.hash === "#bedding") showTab("bed");
+
+  // 배송 지역
+  $("region").querySelectorAll("button").forEach(b => b.onclick = () => {
+    region = b.dataset.region;
+    $("region").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    render();
+  });
+
+  function calc() {
+    const sum = (arr, f) => arr.reduce((s, p) => s + f(p), 0);
+    const mat = products.filter(p => p.tab === "mat" && p.qty > 0);
+    const bed = products.filter(p => p.tab === "bed" && p.qty > 0);
+    const matCount = sum(mat, p => p.qty), bedCount = sum(bed, p => p.qty);
+    const matSubtotal = sum(mat, p => p.qty * p.price);
+    const shipping = matCount * SHIPPING[region];
+    const bedSupply = sum(bed, p => p.qty * p.price);
+    const bedVat = Math.round(bedSupply * 0.1);
+    const total = matSubtotal + shipping + bedSupply + bedVat;
+    const supply = Math.round((matSubtotal + shipping) / 1.1) + bedSupply;
+    return { mat, bed, matCount, bedCount, count: matCount + bedCount, matSubtotal, shipping, bedSupply, bedVat, total, supply, tax: total - supply };
+  }
+
+  const shipText = r => `${REGION_NAME[region]}${SHIPPING[region] && r.matCount ? ` · ${fmt(SHIPPING[region])}원 × ${r.matCount}개` : ""}`;
+
+  function render() {
+    const r = calc();
+    products.forEach(p => {
+      const tr = $("row-" + p.id);
+      const input = tr.querySelector("input");
+      if (!(document.activeElement === input && input.value === "")) input.value = p.qty;
+      tr.querySelector('[data-act="dec"]').disabled = p.qty === 0;
+      tr.querySelector(".line").textContent = p.qty ? fmt(p.qty * p.price) : "-";
+      tr.classList.toggle("active", p.qty > 0);
+    });
+    $("badge-mat").textContent = r.matCount || "";
+    $("badge-bed").textContent = r.bedCount || "";
+
+    const li = p => `<li><span>${p.label} × ${p.qty}</span><span>${won(p.qty * p.price)}</span></li>`;
+    $("items").innerHTML =
+      (r.mat.length ? `<li class="sumhead">매트리스·파운데이션 (부가세 포함)</li>` + r.mat.map(li).join("") : "") +
+      (r.bed.length ? `<li class="sumhead">침구 (공급가액)</li>` + r.bed.map(li).join("") : "");
+    $("empty").style.display = r.count ? "none" : "block";
+
+    const row = (a, b, cls = "") => `<div class="row ${cls}"><span>${a}</span><span>${b}</span></div>`;
+    let rows = "";
+    if (r.matCount || !r.bedCount) {
+      rows += row(`매트리스·파운데이션 (${r.matCount}개)`, won(r.matSubtotal));
+      rows += row(`배송비 (${shipText(r)})`, won(r.shipping), "muted");
+    }
+    if (r.bedCount) {
+      rows += row(`침구 공급가액 (${r.bedCount}개)`, won(r.bedSupply));
+      rows += row(`침구 부가세 10%`, won(r.bedVat), "muted");
+      rows += row(`침구 배송비 (없음)`, "0원", "muted");
+    }
+    $("sumRows").innerHTML = rows;
+
+    $("total").textContent = won(r.total);
+    $("supply").textContent = fmt(r.supply);
+    $("tax").textContent = fmt(r.tax);
+    $("mbarInfo").textContent = `${r.count}개${r.shipping ? ` · 지방 배송 +${fmt(r.shipping)}` : ""}`;
+    $("mbarTotal").textContent = won(r.total);
+  }
+
+  function toast(msg) {
+    $("toast").textContent = msg;
+    clearTimeout(toast.t);
+    toast.t = setTimeout(() => $("toast").textContent = "", 2200);
+  }
+
+  $("mbarBtn").onclick = () => document.querySelector(".card").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("reset").onclick = () => {
+    products.forEach(p => p.qty = 0);
+    bedState.q = bedState.ss = 0; bedState.used = false;
+    ["bedQ", "bedSS"].forEach(id => { $(id).querySelector("input").value = 0; $(id).querySelector('[data-act="dec"]').disabled = true; });
+    $("applied").textContent = "";
+    render(); toast("초기화했습니다"); };
+
+  // ---------- 이미지 내보내기 ----------
+  let downloads = null;
+  try { window.claude?.use?.("downloads").then(d => { downloads = d; }).catch(() => {}); } catch {}
+
+  function drawQuote() {
+    const r = calc();
+    const S = 2, W = 820, P = 48;
+    const FONT = '"Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+    const cv = document.createElement("canvas");
+    cv.width = W * S; cv.height = 6000 * S;
+    const g = cv.getContext("2d");
+    g.scale(S, S);
+    g.fillStyle = "#fffdf9"; g.fillRect(0, 0, W, 6000);
+    const C = { ink: "#2f2925", muted: "#8a7b6d", line: "#e4dbd0", cat: "#efe6dc", accent: "#a8876a" };
+    const text = (t, x, y, { size = 15, weight = 400, color = C.ink, align = "left", max } = {}) => {
+      g.font = `${weight} ${size}px ${FONT}`; g.fillStyle = color; g.textAlign = align; g.textBaseline = "middle";
+      if (max && g.measureText(t).width > max) { while (t.length > 1 && g.measureText(t + "…").width > max) t = t.slice(0, -1); t += "…"; }
+      g.fillText(t, x, y);
+    };
+    const hline = (y, w = 1, color = C.line) => { g.fillStyle = color; g.fillRect(P, y, W - 2 * P, w); };
+    const colPrice = 548, colQty = 618, colAmt = W - P;
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+
+    let y = P + 18;
+    text("견 적 서", W / 2, y, { size: 34, weight: 800, align: "center" });
+    y += 44;
+    text(dateStr, P, y, { size: 14, color: C.muted });
+    text("단위: 원", W - P, y, { size: 14, color: C.muted, align: "right" });
+    y += 22; hline(y, 3, C.ink); y += 3;
+
+    const header = (title) => {
+      g.fillStyle = C.cat; g.fillRect(P, y, W - 2 * P, 40);
+      text(title, P + 14, y + 20, { size: 15, weight: 700, max: W - 2 * P - 28 });
+      y += 40;
+      text("품목", P + 14, y + 18, { size: 13, color: C.muted });
+      text("단가", colPrice, y + 18, { size: 13, color: C.muted, align: "right" });
+      text("수량", colQty, y + 18, { size: 13, color: C.muted, align: "right" });
+      text("금액", colAmt - 14, y + 18, { size: 13, color: C.muted, align: "right" });
+      y += 36; hline(y);
+    };
+    const item = (name, sub, p) => {
+      const h = sub ? 52 : 40;
+      const my = y + h / 2;
+      text(name, P + 14, sub ? my - 9 : my, { size: 15, max: colPrice - P - 110 });
+      if (sub) text(sub, P + 14, my + 12, { size: 12, color: C.muted, max: colPrice - P - 110 });
+      text(fmt(p.price), colPrice, my, { size: 15, align: "right" });
+      text(fmt(p.qty), colQty, my, { size: 15, align: "right" });
+      text(fmt(p.qty * p.price), colAmt - 14, my, { size: 15, weight: 700, align: "right" });
+      y += h; hline(y);
+    };
+    const sumRow = (a, b, muted) => {
+      text(a, P + 14, y + 17, { size: 14, color: muted ? C.muted : C.ink });
+      text(b, colAmt - 14, y + 17, { size: 14, color: muted ? C.muted : C.ink, weight: muted ? 400 : 700, align: "right" });
+      y += 34;
+    };
+
+    if (r.matCount) {
+      header("매트리스 · 파운데이션  (부가세 포함)");
+      r.mat.forEach(p => item(p.label, "", p));
+      y += 6;
+      sumRow(`소계 (${r.matCount}개)`, won(r.matSubtotal));
+      sumRow(`배송비 (${shipText(r)})`, won(r.shipping), true);
+      y += 14;
+    }
+    if (r.bedCount) {
+      header("침구  (부가세 별도)" + (bedState.used ? `  ·  ${bedBasis()}` : ""));
+      r.bed.forEach(p => item(p.label, `${p.it.size}${p.it.note ? " · " + p.it.note : ""}`, p));
+      y += 6;
+      sumRow(`공급가액 (${r.bedCount}개)`, won(r.bedSupply));
+      sumRow("부가세 10%", won(r.bedVat), true);
+      sumRow("배송비 (침구 배송비 없음)", "0원", true);
+      y += 14;
+    }
+
+    g.fillStyle = C.ink; g.fillRect(P, y, W - 2 * P, 76);
+    text("총 견적 금액", P + 20, y + 38, { size: 17, weight: 700, color: "#fff" });
+    text(won(r.total), W - P - 20, y + 38, { size: 30, weight: 800, color: "#fff", align: "right" });
+    y += 76 + 20;
+    text(`부가세 포함  ·  공급가액 ${won(r.supply)}  /  부가세 ${won(r.tax)}`, W - P, y, { size: 13, color: C.muted, align: "right" });
+    y += 30;
+    if (r.matCount) { text("※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.", P, y, { size: 13, color: C.muted }); y += 26; }
+    y += P - 10;
+
+    const out = document.createElement("canvas");
+    out.width = W * S; out.height = Math.ceil(y * S);
+    out.getContext("2d").drawImage(cv, 0, 0);
+    return out;
+  }
+
+  let lastBlob = null, lastUrl = null;
+  const fileName = () => { const d = new Date(); return `견적서_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}.png`; };
+  function mtoast(msg) { $("modalToast").textContent = msg; clearTimeout(mtoast.t); mtoast.t = setTimeout(() => $("modalToast").textContent = "", 2500); }
+
+  $("exportImg").onclick = () => {
+    if (!calc().count) return toast("먼저 수량을 선택하세요");
+    const cv = drawQuote();
+    cv.toBlob(blob => {
+      lastBlob = blob;
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(blob);
+      $("previewImg").src = lastUrl;
+      $("modal").hidden = false;
+      $("imgSave").focus();
+    }, "image/png");
+  };
+  const closeModal = () => { $("modal").hidden = true; };
+  $("modalClose").onclick = closeModal;
+  $("modal").addEventListener("click", e => { if (e.target === $("modal")) closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("modal").hidden) closeModal(); });
+
+  $("imgSave").onclick = async () => {
+    if (!lastBlob) return;
+    if (downloads) {
+      try { await downloads.save({ filename: fileName(), data: lastBlob }); mtoast("저장했습니다"); }
+      catch (e) { mtoast(e && e.code === "declined" ? "저장을 취소했습니다" : "여기서는 저장할 수 없어요. 이미지를 길게 눌러 저장해 주세요"); }
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = lastUrl; a.download = fileName();
+    document.body.appendChild(a); a.click(); a.remove();
+    mtoast("저장을 시작했습니다. 안 되면 이미지를 길게 눌러 저장해 주세요");
+  };
+  $("imgCopy").onclick = async () => {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": lastBlob })]);
+      mtoast("이미지를 복사했습니다. 카톡·문자에 붙여넣으세요");
+    } catch { mtoast("이 브라우저는 이미지 복사를 지원하지 않아요. PNG 저장을 이용해 주세요"); }
+  };
+  $("copy").onclick = async () => {
+    const r = calc();
+    if (!r.count) return toast("먼저 수량을 선택하세요");
+    const line = p => `· ${p.label} ${fmt(p.price)}원 × ${p.qty} = ${won(p.qty * p.price)}`;
+    const lines = [`[견적서] ${new Date().toLocaleDateString("ko-KR")}`, ""];
+    if (r.matCount) lines.push("■ 매트리스·파운데이션 (부가세 포함)", ...r.mat.map(line),
+      `소계 (${r.matCount}개): ${won(r.matSubtotal)}`, `배송비 (${shipText(r)}): ${won(r.shipping)}`, "");
+    if (r.bedCount) lines.push("■ 침구 (부가세 별도 단가)" + (bedState.used ? ` — ${bedBasis()}` : ""), ...r.bed.map(p => `· ${p.label} (${p.it.size}) ${fmt(p.price)}원 × ${p.qty} = ${won(p.qty * p.price)}`),
+      `공급가액 (${r.bedCount}개): ${won(r.bedSupply)}`, `부가세 10%: ${won(r.bedVat)}`, "배송비: 0원 (침구 배송비 없음)", "");
+    lines.push(`총 견적 금액: ${won(r.total)} (부가세 포함)`);
+    if (r.matCount) lines.push("", "※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.");
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove();
+    }
+    toast("견적 내용을 복사했습니다");
+  };
+
+
+  render();
+}
+</script>
+</body>
+</html>
