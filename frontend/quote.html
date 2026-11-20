@@ -2,7 +2,12 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f2ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="견적 계산기">
+<meta name="format-detection" content="telephone=no">
 <title>견적 계산기</title>
 <style>
   :root {
@@ -80,13 +85,41 @@
 
   .note { color: var(--muted); font-size: 14px; margin-top: 18px; }
 
+  tr.sec { display: none; }
+  .mbar { display: none; }
+  html { -webkit-text-size-adjust: 100%; }
+  button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+  @media (max-width: 900px) {
+    .card { position: static; }
+  }
   @media (max-width: 640px) {
+    .wrap { padding: calc(28px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(110px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
     h1 { font-size: 28px; }
-    td, th { padding: 8px 6px; font-size: 14px; }
-    td.line { display: none; }
-    th.line { display: none; }
-    .stepper button { width: 30px; }
-    .stepper input { width: 38px; }
+    .sub { margin-bottom: 20px; }
+    th.cat-h, td.cat { display: none; }
+    tr.sec { display: table-row; }
+    tr.sec td { background: var(--cat); font-weight: 700; padding: 12px 14px; border-bottom: 1px solid #d6c8b8; }
+    tr.sec td small { font-weight: 400; color: var(--muted); margin-left: 6px; font-size: 13px; }
+    td, th { padding: 8px 8px; font-size: 15px; }
+    th.line, td.line { display: none; }
+    td.size { text-align: left; padding-left: 14px; width: auto; }
+    td.price { width: auto; }
+    td.qty { width: 1%; white-space: nowrap; padding-right: 10px; }
+    .stepper button { width: 44px; height: 44px; font-size: 22px; }
+    .stepper input { width: 46px; height: 44px; font-size: 16px; }
+    .seg button { padding: 14px 8px; font-size: 16px; }
+    .actions button { padding: 14px 6px; font-size: 15px; }
+    .items { max-height: none; }
+    .mbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+      padding: 12px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      background: var(--ink); color: #fff; box-shadow: 0 -4px 16px rgba(0,0,0,.12);
+    }
+    .mbar .mt { font-size: 12px; opacity: .75; }
+    .mbar b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
+    .mbar button { flex: none; border: none; border-radius: 10px; background: var(--accent); color: #fff; font: 700 15px/1 inherit; font-family: inherit; padding: 14px 16px; min-height: 44px; }
   }
   @media print {
     body { background: #fff; }
@@ -108,7 +141,7 @@
     <div>
       <table>
         <thead>
-          <tr><th>구분</th><th>사이즈</th><th>단가</th><th>수량</th><th class="line">금액</th></tr>
+          <tr><th class="cat-h">구분</th><th>사이즈</th><th>단가</th><th>수량</th><th class="line">금액</th></tr>
         </thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -142,6 +175,11 @@
   </div>
 </div>
 
+<div class="mbar" id="mbar">
+  <div><span class="mt" id="mbarInfo">0개 · 서울 배송</span><b id="mbarTotal">0원</b></div>
+  <button id="mbarBtn">견적 보기</button>
+</div>
+
 <script>
   const SHIPPING = { seoul: 0, local: 60000 };
   const REGION_NAME = { seoul: "서울", local: "지방" };
@@ -168,6 +206,10 @@
     tr.id = "row-" + p.id;
     let html = "";
     if (i % 4 === 0) {
+      const sec = document.createElement("tr");
+      sec.className = "sec";
+      sec.innerHTML = `<td colspan="4">${p.cat.name}${p.cat.spec ? `<small>${p.cat.spec}</small>` : ""}</td>`;
+      tbody.appendChild(sec);
       html += `<td class="cat" rowspan="4">${p.cat.name}${p.cat.spec ? `<small>${p.cat.spec}</small>` : ""}</td>`;
     }
     html += `<td class="size">${p.size}</td>
@@ -232,6 +274,8 @@
     $("shipping").textContent = won(r.shipping);
     $("total").textContent = won(r.total);
     $("supply").textContent = r.supply.toLocaleString("ko-KR");
+    $("mbarInfo").textContent = `${r.count}개 · ${REGION_NAME[region]} 배송${r.shipping ? " +" + r.shipping.toLocaleString("ko-KR") : ""}`;
+    $("mbarTotal").textContent = won(r.total);
     $("tax").textContent = r.tax.toLocaleString("ko-KR");
   }
 
@@ -241,6 +285,7 @@
     toast.t = setTimeout(() => $("toast").textContent = "", 2200);
   }
 
+  $("mbarBtn").onclick = () => document.querySelector(".card").scrollIntoView({ behavior: "smooth", block: "start" });
   $("reset").onclick = () => { products.forEach(p => p.qty = 0); render(); toast("초기화했습니다"); };
   $("print").onclick = () => window.print();
   $("copy").onclick = async () => {
