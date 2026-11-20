@@ -97,6 +97,23 @@
   .sumhead { font-size: 13px; color: var(--muted); margin: 10px 0 2px; font-weight: 700; }
   .sumhead:first-child { margin-top: 0; }
 
+  .beds { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 14px; margin-bottom: 16px; }
+  .beds h3 { margin: 0 0 4px; font-size: 16px; }
+  .beds .hint { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+  .bedgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: end; }
+  .bedgrid .label { margin-bottom: 6px; }
+  .bedgrid .seg { margin: 0; grid-template-columns: repeat(4, 1fr); }
+  .bedgrid .seg button { padding: 9px 4px; min-height: 36px; }
+  .beds details { margin-top: 12px; font-size: 14px; }
+  .beds summary { cursor: pointer; color: var(--accent-dark); padding: 6px 0; }
+  .recipe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 8px 0 6px; }
+  .recipe label { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+  .recipe input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--ink); background: #fff; width: 100%; }
+  .recipe-note { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 6px 0 0; }
+  .applied { margin-top: 10px; font-size: 13px; color: var(--accent-dark); min-height: 18px; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); min-height: 36px; }
+  .chk input { width: 20px; height: 20px; accent-color: var(--accent-dark); }
+
   .note { color: var(--muted); font-size: 14px; margin-top: 18px; }
 
   tr.sec { display: none; }
@@ -127,6 +144,10 @@
     .items { max-height: none; }
     td.item { padding-left: 12px; }
     .tabs button { font-size: 15px; }
+    .bedgrid { grid-template-columns: 1fr 1fr; }
+    .bedgrid .mult { grid-column: 1 / -1; }
+    .bedgrid .seg button { min-height: 44px; font-size: 15px; }
+    .recipe { grid-template-columns: 1fr 1fr; }
     .mbar {
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
@@ -171,6 +192,34 @@
       </section>
 
       <section class="pane" id="pane-bed" hidden>
+        <div class="beds">
+          <h3>침대 수로 자동 계산 <small style="font-weight:400;color:var(--muted)">(선택)</small></h3>
+          <p class="hint">침대 수와 교체 배수를 넣으면 아래 수량이 자동으로 채워집니다. 채운 뒤 개별 수량을 직접 고쳐도 됩니다.</p>
+          <div class="bedgrid">
+            <div><div class="label">퀸 (Q) 침대</div>
+              <div class="stepper" id="bedQ"><button data-act="dec" aria-label="퀸 침대 수 줄이기">−</button><input type="number" min="0" max="999" value="0" inputmode="numeric" aria-label="퀸 침대 수"><button data-act="inc" aria-label="퀸 침대 수 늘리기">+</button></div></div>
+            <div><div class="label">슈퍼싱글 (SS) 침대</div>
+              <div class="stepper" id="bedSS"><button data-act="dec" aria-label="슈퍼싱글 침대 수 줄이기">−</button><input type="number" min="0" max="999" value="0" inputmode="numeric" aria-label="슈퍼싱글 침대 수"><button data-act="inc" aria-label="슈퍼싱글 침대 수 늘리기">+</button></div></div>
+            <div class="mult"><div class="label">교체 배수 (커버류)</div>
+              <div class="seg" id="mult">
+                <button data-m="1">1배수</button><button data-m="2">2배수</button><button data-m="3" class="on">3배수</button><button data-m="4">4배수</button>
+              </div></div>
+          </div>
+          <label class="chk"><input type="checkbox" id="towelOn" checked> 타올 포함</label>
+          <details>
+            <summary>구성 기준 보기 · 변경</summary>
+            <div class="recipe">
+              <label>퀸 침대당 베개<input type="number" min="0" id="pillowQ" value="2" inputmode="numeric"></label>
+              <label>SS 침대당 베개<input type="number" min="0" id="pillowSS" value="1" inputmode="numeric"></label>
+              <label>1인당 세면타올<input type="number" min="0" id="towelF" value="2" inputmode="numeric"></label>
+              <label>1인당 바스타올<input type="number" min="0" id="towelB" value="1" inputmode="numeric"></label>
+            </div>
+            <p class="recipe-note">침대 1대당 · 방수 매트리스커버 1 · 이불솜 1 · 베개솜과 방수베개커버는 베개 수만큼<br>
+              교체 배수 적용 · 홑겹 매트리스커버 1 · 이불커버 1 · 캥거루 베개커버는 베개 수 × 배수<br>
+              타올 · 베개 1개 = 1인으로 보고, 1인당 개수 × 배수 · 퀸은 Q 품목, 슈퍼싱글은 SS·80 품목</p>
+          </details>
+          <div class="applied" id="applied"></div>
+        </div>
         <table>
           <thead>
             <tr><th>품목</th><th>단가</th><th>수량</th><th class="line">공급가액</th></tr>
@@ -314,6 +363,54 @@
     });
   });
 
+  // 침대 수 자동 계산
+  const bedState = { q: 0, ss: 0, m: 3, used: false };
+  const num = id => Math.max(0, Math.floor(Number($(id).value) || 0));
+  const prod = id => products.find(p => p.id === id);
+  function applyBeds() {
+    const { q, ss, m } = bedState;
+    const pq = num("pillowQ"), pss = num("pillowSS");
+    const pillows = q * pq + ss * pss;
+    const towels = $("towelOn").checked;
+    const plan = {
+      "b0-0": q, "b0-1": ss,                 // 방수 매트리스커버
+      "b0-2": q * m, "b0-3": ss * m,         // 홑겹 매트리스커버
+      "b1-0": q, "b1-1": ss,                 // 이불솜
+      "b1-2": q * m, "b1-3": ss * m,         // 이불커버
+      "b2-0": pillows, "b2-1": pillows,      // 베개솜, 방수베개커버
+      "b2-2": pillows * m,                   // 캥거루 베개커버
+      "b3-0": towels ? pillows * num("towelF") * m : 0,
+      "b3-1": towels ? pillows * num("towelB") * m : 0,
+    };
+    Object.entries(plan).forEach(([id, v]) => prod(id).qty = Math.min(MAX_QTY, v));
+    bedState.used = q + ss > 0;
+    $("applied").textContent = bedState.used ? `✓ ${bedBasis()} 기준으로 수량을 채웠습니다` : "";
+    render();
+  }
+  const bedBasis = () => [bedState.q && `퀸 ${bedState.q}대`, bedState.ss && `슈퍼싱글 ${bedState.ss}대`].filter(Boolean).join(" · ") + ` · ${bedState.m}배수`;
+  [["bedQ", "q"], ["bedSS", "ss"]].forEach(([id, key]) => {
+    const el = $(id), input = el.querySelector("input");
+    const set = v => {
+      bedState[key] = Math.max(0, Math.min(999, Math.floor(Number(v) || 0)));
+      if (!(document.activeElement === input && input.value === "")) input.value = bedState[key];
+      el.querySelector('[data-act="dec"]').disabled = bedState[key] === 0;
+      applyBeds();
+    };
+    el.querySelector('[data-act="dec"]').onclick = () => set(bedState[key] - 1);
+    el.querySelector('[data-act="inc"]').onclick = () => set(bedState[key] + 1);
+    el.querySelector('[data-act="dec"]').disabled = true;
+    input.addEventListener("input", () => set(input.value));
+    input.addEventListener("focus", () => input.select());
+    input.addEventListener("blur", () => { input.value = bedState[key]; });
+  });
+  $("mult").querySelectorAll("button").forEach(b => b.onclick = () => {
+    bedState.m = Number(b.dataset.m);
+    $("mult").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    if (bedState.q + bedState.ss) applyBeds();
+  });
+  ["pillowQ", "pillowSS", "towelF", "towelB", "towelOn"].forEach(id =>
+    $(id).addEventListener(id === "towelOn" ? "change" : "input", () => { if (bedState.q + bedState.ss) applyBeds(); }));
+
   // 탭
   const tabBtns = document.querySelectorAll(".tabs button");
   function showTab(t) {
@@ -395,7 +492,12 @@
   }
 
   $("mbarBtn").onclick = () => document.querySelector(".card").scrollIntoView({ behavior: "smooth", block: "start" });
-  $("reset").onclick = () => { products.forEach(p => p.qty = 0); render(); toast("초기화했습니다"); };
+  $("reset").onclick = () => {
+    products.forEach(p => p.qty = 0);
+    bedState.q = bedState.ss = 0; bedState.used = false;
+    ["bedQ", "bedSS"].forEach(id => { $(id).querySelector("input").value = 0; $(id).querySelector('[data-act="dec"]').disabled = true; });
+    $("applied").textContent = "";
+    render(); toast("초기화했습니다"); };
   $("print").onclick = () => window.print();
   $("copy").onclick = async () => {
     const r = calc();
@@ -404,7 +506,7 @@
     const lines = [`[견적서] ${new Date().toLocaleDateString("ko-KR")}`, ""];
     if (r.matCount) lines.push("■ 매트리스·파운데이션 (부가세 포함)", ...r.mat.map(line),
       `소계 (${r.matCount}개): ${won(r.matSubtotal)}`, `배송비 (${shipText(r)}): ${won(r.shipping)}`, "");
-    if (r.bedCount) lines.push("■ 침구 (부가세 별도 단가)", ...r.bed.map(p => `· ${p.label} (${p.it.size}) ${fmt(p.price)}원 × ${p.qty} = ${won(p.qty * p.price)}`),
+    if (r.bedCount) lines.push("■ 침구 (부가세 별도 단가)" + (bedState.used ? ` — ${bedBasis()}` : ""), ...r.bed.map(p => `· ${p.label} (${p.it.size}) ${fmt(p.price)}원 × ${p.qty} = ${won(p.qty * p.price)}`),
       `공급가액 (${r.bedCount}개): ${won(r.bedSupply)}`, `부가세 10%: ${won(r.bedVat)}`, "");
     lines.push(`총 견적 금액: ${won(r.total)} (부가세 포함)`);
     if (r.matCount) lines.push("", "※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.");
