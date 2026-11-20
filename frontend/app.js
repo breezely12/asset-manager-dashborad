@@ -89,17 +89,25 @@ function renderDonut(svgId, legendId, segments, options = {}) {
     return;
   }
 
+  const visibleSegments = segments.filter((s) => s.value > 0);
+  const tonalColor = (i, n) => {
+    if (n <= 1) return `color-mix(in srgb, var(${options.tonalBase}) 70%, white)`;
+    const pct = 92 - (i / (n - 1)) * 68; // darkest/most saturated first, fading lighter
+    return `color-mix(in srgb, var(${options.tonalBase}) ${pct.toFixed(0)}%, white)`;
+  };
+
   let cumulativeDeg = -90;
-  segments.filter((s) => s.value > 0).forEach((seg) => {
+  visibleSegments.forEach((seg, i) => {
     const fraction = seg.value / total;
     const segDeg = fraction * 360;
     const drawDeg = Math.max(segDeg - gapDeg, 0.5);
     const dash = (drawDeg / 360) * circumference;
+    const color = options.tonalBase ? tonalColor(i, visibleSegments.length) : cssVar(seg.colorVar);
 
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", cx); circle.setAttribute("cy", cy); circle.setAttribute("r", r);
     circle.setAttribute("fill", "none");
-    circle.setAttribute("stroke", cssVar(seg.colorVar));
+    circle.setAttribute("stroke", color);
     circle.setAttribute("stroke-width", strokeWidth);
     circle.setAttribute("stroke-linecap", "round");
     circle.setAttribute("stroke-dasharray", `${dash} ${circumference - dash}`);
@@ -109,7 +117,7 @@ function renderDonut(svgId, legendId, segments, options = {}) {
 
     if (fraction * 100 >= minPct) {
       const li = document.createElement("li");
-      li.innerHTML = `<span class="swatch" style="background:${cssVar(seg.colorVar)}"></span>` +
+      li.innerHTML = `<span class="swatch" style="background:${color}"></span>` +
         `<span>${seg.label}</span><span class="legend-value">${(fraction * 100).toFixed(1)}%</span>`;
       legend.appendChild(li);
     }
@@ -590,10 +598,9 @@ async function loadLedger() {
   ]);
 
   const categories = Object.entries(txSummary.by_category).sort((a, b) => b[1] - a[1]);
-  const colorVars = ["--series-1", "--series-2", "--series-3", "--series-4", "--series-5", "--series-6", "--series-7", "--series-8"];
   renderDonut("expenseChart", "expenseLegend",
-    categories.map(([label, value], i) => ({ label, value, colorVar: colorVars[i % colorVars.length] })),
-    { minPct: 2 }
+    categories.map(([label, value]) => ({ label, value })),
+    { minPct: 2, tonalBase: "--series-8" }
   );
 
   const fillCategoryBox = (tbodyId, byCategory, base) => {
