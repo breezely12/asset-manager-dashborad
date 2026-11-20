@@ -244,7 +244,7 @@
 
     <aside class="card">
       <h2>견적 요약</h2>
-      <div class="label">배송 지역 (매트리스·파운데이션)</div>
+      <div class="label">배송 지역 (매트리스·파운데이션만 해당 · 침구는 배송비 없음)</div>
       <div class="seg" id="region">
         <button data-region="seoul" class="on">서울<span>배송비 무료</span></button>
         <button data-region="local">지방<span>개당 60,000원</span></button>
@@ -500,6 +500,7 @@
     if (r.bedCount) {
       rows += row(`침구 공급가액 (${r.bedCount}개)`, won(r.bedSupply));
       rows += row(`침구 부가세 10%`, won(r.bedVat), "muted");
+      rows += row(`침구 배송비 (없음)`, "0원", "muted");
     }
     $("sumRows").innerHTML = rows;
 
@@ -595,6 +596,7 @@
       y += 6;
       sumRow(`공급가액 (${r.bedCount}개)`, won(r.bedSupply));
       sumRow("부가세 10%", won(r.bedVat), true);
+      sumRow("배송비 (침구 배송비 없음)", "0원", true);
       y += 14;
     }
 
@@ -660,7 +662,7 @@
     if (r.matCount) lines.push("■ 매트리스·파운데이션 (부가세 포함)", ...r.mat.map(line),
       `소계 (${r.matCount}개): ${won(r.matSubtotal)}`, `배송비 (${shipText(r)}): ${won(r.shipping)}`, "");
     if (r.bedCount) lines.push("■ 침구 (부가세 별도 단가)" + (bedState.used ? ` — ${bedBasis()}` : ""), ...r.bed.map(p => `· ${p.label} (${p.it.size}) ${fmt(p.price)}원 × ${p.qty} = ${won(p.qty * p.price)}`),
-      `공급가액 (${r.bedCount}개): ${won(r.bedSupply)}`, `부가세 10%: ${won(r.bedVat)}`, "");
+      `공급가액 (${r.bedCount}개): ${won(r.bedSupply)}`, `부가세 10%: ${won(r.bedVat)}`, "배송비: 0원 (침구 배송비 없음)", "");
     lines.push(`총 견적 금액: ${won(r.total)} (부가세 포함)`);
     if (r.matCount) lines.push("", "※ 현장 상황 및 계단 상황에 따라 추가 배송비가 발생할 수 있습니다.");
     const text = lines.join("\n");
