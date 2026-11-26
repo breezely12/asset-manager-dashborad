@@ -18,6 +18,7 @@
 
   <nav class="tabs">
     <button class="tab-btn active" data-tab="overview">전체 현황</button>
+    <button class="tab-btn" data-tab="networth">순자산</button>
     <button class="tab-btn" data-tab="holdings">자산 목록</button>
     <button class="tab-btn" data-tab="ledger">가계부</button>
     <button class="tab-btn" data-tab="yearly">연간 리포트</button>
@@ -76,6 +77,73 @@
         <span id="goalsCurrentYear" class="muted"></span>
       </div>
       <ul id="goalsList" class="goals-list"></ul>
+    </div>
+  </section>
+
+  <!-- NET WORTH -->
+  <section id="tab-networth" class="tab-panel">
+    <div class="chart-card nw-hero">
+      <div class="nw-hero-head">
+        <div>
+          <div class="stat-label" id="nwGoalLabel">최종 목표</div>
+          <div class="nw-hero-value" id="nwCurrent">-</div>
+          <div class="muted" id="nwTargetLine"></div>
+        </div>
+        <div class="nw-hero-pct" id="nwPct">-</div>
+      </div>
+      <div class="nw-track-wrap">
+        <div class="nw-track"><div class="nw-fill" id="nwFill"></div></div>
+        <div class="nw-ticks" id="nwTicks"></div>
+      </div>
+      <div class="nw-hero-foot">
+        <span id="nwRemaining"></span>
+        <span id="nwYearsLeft"></span>
+      </div>
+    </div>
+
+    <h3 class="nw-section-title">목표까지의 속도</h3>
+    <div class="stat-row">
+      <div class="stat-tile">
+        <div class="stat-label">필요한 연평균 증가율</div>
+        <div class="stat-value" id="nwRequiredCagr">-</div>
+        <div class="nw-sub" id="nwRequiredCagrNote"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">필요한 월평균 증가액</div>
+        <div class="stat-value" id="nwRequiredMonthly">-</div>
+        <div class="nw-sub" id="nwRequiredAnnual"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">실제 연평균 증가율</div>
+        <div class="stat-value" id="nwActualCagr">-</div>
+        <div class="nw-sub" id="nwActualNote"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">지금 속도면 도달 예상</div>
+        <div class="stat-value" id="nwProjected">-</div>
+        <div class="nw-sub" id="nwProjectedNote"></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="panel-header">
+        <h3>목표 설정</h3>
+        <button id="addGoalBtn" class="btn btn-primary btn-small">+ 목표 추가</button>
+      </div>
+      <form id="birthYearForm" class="nw-birth-row">
+        <label>출생연도 <input type="number" id="nwBirthYear" min="1900" max="2100" required /></label>
+        <button type="submit" class="btn btn-secondary btn-small">저장</button>
+        <span class="muted" id="nwBirthYearMsg"></span>
+      </form>
+      <div class="table-wrap">
+        <table class="data-table" id="goalsTable">
+          <thead>
+            <tr><th>이름</th><th>나이</th><th>연도</th><th>목표 순자산</th><th>진행률</th><th></th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="muted nw-hint">가장 큰 목표 금액이 위의 최종 목표로 표시되고, 나머지는 진행 막대의 중간 눈금이 됩니다. 실제 증가율은 "오늘 스냅샷 저장"으로 쌓인 기록(30일 이상)으로 계산합니다.</p>
     </div>
   </section>
 
@@ -426,6 +494,24 @@
       <label>메모 <input type="text" id="l_note" /></label>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="liabilityCancelBtn">취소</button>
+        <button type="submit" class="btn btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+<!-- Goal modal -->
+<div id="goalModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3 id="goalModalTitle">목표 추가</h3>
+    <form id="goalForm">
+      <input type="hidden" id="g_id" />
+      <label>이름 <input type="text" id="g_label" placeholder="예: 60대 목표" /></label>
+      <div class="field-row">
+        <label>나이 <input type="number" id="g_age" min="1" max="120" required /></label>
+        <label>목표 순자산(억원) <input type="number" step="any" min="0" id="g_target_eok" required placeholder="예: 100" /></label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="goalCancelBtn">취소</button>
         <button type="submit" class="btn btn-primary">저장</button>
       </div>
     </form>
