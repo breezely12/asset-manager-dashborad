@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import os
@@ -11,13 +12,14 @@ from typing import Literal, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from . import prices
+from . import jobs, prices
 from .db import get_conn, init_db
 
 app = FastAPI(title="Asset Manager")
@@ -60,8 +62,12 @@ CATEGORIES = ("stock", "crypto", "cash", "realestate", "other")
 
 
 @app.on_event("startup")
-def _startup() -> None:
+async def _startup() -> None:
     init_db()
+    # keep a reference so the task isn't garbage-collected
+    app.state.daily_jobs = asyncio.create_task(
+        jobs.run_forever(create_snapshot, _has_holdings, _price_failures)
+    )
 
 
 # ---------- schemas ----------
@@ -270,7 +276,17 @@ def summary():
         "total_liabilities_krw": total_liabilities_krw,
         "net_worth_krw": net_worth_krw,
         "by_category": by_category,
+        "price_failures": sum(1 for h in enriched if h["price_ok"] is False),
     }
+
+
+def _has_holdings() -> bool:
+    with get_conn() as conn:
+        return conn.execute("SELECT 1 FROM holdings LIMIT 1").fetchone() is not None
+
+
+def _price_failures() -> int:
+    return summary()["price_failures"]
 
 
 @app.post("/api/snapshot")
@@ -648,6 +664,135 @@ def networth_progress():
         "pace": pace,
         "milestones": milestones,
     }
+
+
+# ---------- scenario simulator ----------
+
+# Ledger "expense" rows under these 대분류 move money into assets rather than
+# spending it, so they count as saving, not consumption.
+SAVING_MAJORS = ("저축·투자", "연금·노후", "비상금")
+
+
+def _major(category: str) -> str:
+    return (category or "").split("-", 1)[0]
+
+
+@app.get("/api/simulator/defaults")
+def simulator_defaults():
+    """Starting values for the 100억 scenario simulator.
+
+    avg_monthly_saving: average of (income - consumption) over the months in the
+    last 12 that have any ledger entries. Saving/pension/emergency-fund transfers
+    are not consumption, so they stay in the saving figure.
+    """
+    progress = networth_progress()
+    today = date.today()
+    # months strictly after this one a year ago = the last 12 months, this month included
+    start_month = f"{today.year - 1}-{today.month:02d}"
+    with get_conn() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT date, type, category, amount FROM transactions "
+                "WHERE kind = 'ledger' AND count_in_total = 1 AND substr(date, 1, 7) > ?",
+                (start_month,),
+            )
+        ]
+    months: dict[str, dict[str, float]] = {}
+    for r in rows:
+        m = months.setdefault(r["date"][:7], {"income": 0.0, "consumption": 0.0, "saving_transfers": 0.0})
+        if r["type"] == "income":
+            m["income"] += r["amount"]
+        elif _major(r["category"]) in SAVING_MAJORS:
+            m["saving_transfers"] += r["amount"]
+        else:
+            m["consumption"] += r["amount"]
+    n = len(months)
+    avg_income = sum(m["income"] for m in months.values()) / n if n else None
+    avg_consumption = sum(m["consumption"] for m in months.values()) / n if n else None
+    avg_saving = (avg_income - avg_consumption) if n else None
+    return {
+        "current_net_worth_krw": progress["current_net_worth_krw"],
+        "birth_year": progress.get("birth_year"),
+        "goals": list_goals()["goals"],
+        "ledger_months": n,
+        "avg_monthly_income": avg_income,
+        "avg_monthly_consumption": avg_consumption,
+        "avg_monthly_saving": avg_saving,
+        "actual_cagr": (progress.get("pace") or {}).get("actual_cagr"),
+    }
+
+
+# ---------- business income (Airbnb / consulting) ----------
+
+BUSINESS_INCOME_MAJOR = "사업소득"
+BUSINESS_EXPENSE_MAJOR = "사업비용"
+
+
+@app.get("/api/business/summary")
+def business_summary(year: str):
+    with get_conn() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT date, type, category, amount FROM transactions "
+                "WHERE kind = 'ledger' AND count_in_total = 1 AND date LIKE ? "
+                "AND (category LIKE ? OR category LIKE ?)",
+                (f"{year}-%", f"{BUSINESS_INCOME_MAJOR}%", f"{BUSINESS_EXPENSE_MAJOR}%"),
+            )
+        ]
+    months = [{"month": f"{year}-{m:02d}", "income": 0.0, "expense": 0.0} for m in range(1, 13)]
+    by_line: dict[str, dict[str, float]] = {}
+    for r in rows:
+        major = _major(r["category"])
+        sub = r["category"].split("-", 1)[1] if "-" in r["category"] else "기타"
+        # The 대분류 decides revenue vs cost; a row of the opposite type (a refund
+        # under 사업비용, a chargeback under 사업소득) is subtracted.
+        sign = 1 if r["type"] == ("income" if major == BUSINESS_INCOME_MAJOR else "expense") else -1
+        amount = sign * r["amount"]
+        mi = int(r["date"][5:7]) - 1
+        line = by_line.setdefault(sub, {"income": 0.0, "expense": 0.0})
+        if major == BUSINESS_INCOME_MAJOR:
+            months[mi]["income"] += amount
+            line["income"] += amount
+        else:
+            months[mi]["expense"] += amount
+            line["expense"] += amount
+    for m in months:
+        m["net"] = m["income"] - m["expense"]
+    total_income = sum(m["income"] for m in months)
+    total_expense = sum(m["expense"] for m in months)
+    return {
+        "year": year,
+        "months": months,
+        "by_line": {k: {**v, "net": v["income"] - v["expense"]} for k, v in by_line.items()},
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "net": total_income - total_expense,
+    }
+
+
+# ---------- backups & background job status ----------
+
+@app.get("/api/jobs/status")
+def jobs_status():
+    backups = jobs.list_backups()
+    return {
+        **jobs.status,
+        "auto_snapshot_enabled": os.environ.get("AUTO_SNAPSHOT", "1") != "0",
+        "backup_dir": str(jobs.backup_dir()),
+        "backup_count": len(backups),
+        "latest_backup": backups[-1].name if backups else None,
+    }
+
+
+@app.get("/api/backup/download")
+def backup_download():
+    """Fresh consistent copy of the database, for saving somewhere off this computer."""
+    stamp = date.today().isoformat()
+    dest = jobs.backup_dir() / "download" / f"asset_manager-{stamp}.db"
+    jobs.write_backup(dest)
+    return FileResponse(dest, media_type="application/octet-stream", filename=dest.name)
 
 
 # ---------- liabilities ----------

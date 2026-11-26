@@ -11,6 +11,9 @@ const CATEGORY_ORDER = ["stock", "crypto", "cash", "realestate", "other"];
 // household-ledger 대분류 -> 소분류, following the user's reference budget sheet
 const LEDGER_CATEGORY_TAXONOMY = {
   "수입": ["본인월급", "본인상여", "부수입", "투자소득", "기타소득", "양육비"],
+  // business lines share sub names so 사업소득 - 사업비용 nets per line (see /api/business/summary)
+  "사업소득": ["에어비앤비", "컨설팅", "기타"],
+  "사업비용": ["에어비앤비", "컨설팅", "기타"],
   "저축·투자": ["예적금", "주식계좌", "대출원금상환", "펀드/ETF", "달러/금", "가상화폐"],
   "연금·노후": ["개인연금", "퇴직연금", "국민연금"],
   "비상금": ["비상금통장1", "비상금통장2"],
@@ -386,7 +389,217 @@ async function loadNetWorth() {
   renderNetWorthHero(p);
   renderNetWorthPace(p);
   renderGoalsTable(goalsData);
+  loadSimulator();
 }
+
+// ---------- 100억 scenario simulator ----------
+const SIM_STORAGE_KEY = "simInputs.v1";
+const SIM_DEFAULT_RETURN = 6;
+const SIM_DEFAULT_GROWTH = 3;
+const SIM_MAX_YEARS = 60;
+let simDefaults = null;
+
+function simSavedInputs() {
+  try { return JSON.parse(localStorage.getItem(SIM_STORAGE_KEY)) || null; } catch { return null; }
+}
+
+function simLedgerInputs() {
+  const saving = simDefaults && simDefaults.avg_monthly_saving != null ? Math.max(simDefaults.avg_monthly_saving, 0) : 0;
+  return { saving: Math.round(saving / 1e4), ret: SIM_DEFAULT_RETURN, growth: SIM_DEFAULT_GROWTH };
+}
+
+function simReadInputs() {
+  const num = (id) => parseFloat(document.getElementById(id).value);
+  return {
+    saving: Math.max(num("simSaving") || 0, 0),
+    ret: num("simReturn") || 0,
+    growth: num("simGrowth") || 0,
+  };
+}
+
+function simWriteInputs(v) {
+  document.getElementById("simSaving").value = v.saving;
+  document.getElementById("simReturn").value = v.ret;
+  document.getElementById("simGrowth").value = v.growth;
+}
+
+// Monthly compounding: each month the balance grows by the monthly rate and the
+// month's saving is added; the monthly saving steps up by `growth` every 12 months.
+// Returns the balance after `months` months. Linear in start and saving, which
+// is what lets us solve for the required saving directly.
+function simProject(start, monthlySaving, annualReturn, annualGrowth, months) {
+  const rm = Math.pow(1 + annualReturn, 1 / 12) - 1;
+  let bal = start, s = monthlySaving;
+  for (let i = 1; i <= months; i++) {
+    bal = bal * (1 + rm) + s;
+    if (i % 12 === 0) s *= 1 + annualGrowth;
+  }
+  return bal;
+}
+
+function simMonthsUntilYearEnd(targetYear) {
+  const now = new Date();
+  return (targetYear - now.getFullYear()) * 12 + (11 - now.getMonth());
+}
+
+async function loadSimulator() {
+  try {
+    simDefaults = await api("/simulator/defaults");
+  } catch (e) {
+    console.error("simulator defaults failed", e);
+    return;
+  }
+  const basis = simDefaults.ledger_months
+    ? `가계부 최근 ${simDefaults.ledger_months}개월 평균 저축 ${fmtEok(simDefaults.avg_monthly_saving)}/월`
+    : "가계부 기록이 없어 월 저축액 기본값은 0원입니다";
+  setText("simBasis", basis);
+  simWriteInputs(simSavedInputs() || simLedgerInputs());
+  renderSimulator();
+}
+
+function renderSimulator() {
+  if (!simDefaults) return;
+  const inp = simReadInputs();
+  localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(inp));
+  const start = simDefaults.current_net_worth_krw || 0;
+  const saving = inp.saving * 1e4, r = inp.ret / 100, g = inp.growth / 100;
+  const birth = simDefaults.birth_year;
+  const goals = [...simDefaults.goals].sort((a, b) => a.target_krw - b.target_krw);
+  const final = goals[goals.length - 1];
+  const nowYear = new Date().getFullYear();
+
+  // headline: when the final goal is reached under this scenario
+  const headline = document.getElementById("simHeadline");
+  if (!final) {
+    headline.textContent = "목표를 추가하면 시뮬레이션이 표시됩니다";
+  } else {
+    let bal = start, reachMonth = null;
+    const rm = Math.pow(1 + r, 1 / 12) - 1;
+    let s = saving;
+    for (let i = 1; i <= SIM_MAX_YEARS * 12; i++) {
+      bal = bal * (1 + rm) + s;
+      if (i % 12 === 0) s *= 1 + g;
+      if (bal >= final.target_krw) { reachMonth = i; break; }
+    }
+    if (start >= final.target_krw) {
+      headline.innerHTML = `<span class="good">${final.label || "최종 목표"} 이미 달성</span>`;
+    } else if (reachMonth == null) {
+      headline.innerHTML = `이 조건이면 ${SIM_MAX_YEARS}년 안에 <b>${fmtEok(final.target_krw)}</b>에 닿지 못해요`;
+    } else {
+      const d = new Date(); d.setMonth(d.getMonth() + reachMonth);
+      const y = d.getFullYear();
+      const age = birth ? ` (${y - birth}세)` : "";
+      const onTime = final.target_year ? y <= final.target_year : null;
+      const verdict = onTime == null ? "" : onTime
+        ? ` · 목표 연도 ${final.target_year}년보다 <span class="good">${final.target_year - y}년 빠름</span>`
+        : ` · 목표 연도 ${final.target_year}년보다 <span class="critical">${y - final.target_year}년 늦음</span>`;
+      headline.innerHTML = `${fmtEok(final.target_krw)} 도달 예상 <b>${y}년 ${d.getMonth() + 1}월${age}</b>${verdict}`;
+    }
+  }
+
+  // per-goal table
+  const tbody = document.querySelector("#simTable tbody");
+  tbody.innerHTML = "";
+  goals.forEach((goal) => {
+    const tr = document.createElement("tr");
+    if (!goal.target_year) {
+      tr.innerHTML = `<td>${goal.label || "목표"}</td><td>-</td><td>${fmtEok(goal.target_krw)}</td><td colspan="3" class="muted">출생연도를 입력하면 계산됩니다</td>`;
+      tbody.appendChild(tr); return;
+    }
+    const n = simMonthsUntilYearEnd(goal.target_year);
+    if (n < 0) {
+      tr.innerHTML = `<td>${goal.label || "목표"}</td><td>${goal.target_year}년</td><td>${fmtEok(goal.target_krw)}</td><td colspan="3" class="muted">${goal.achieved ? "달성" : "지난 목표"}</td>`;
+      tbody.appendChild(tr); return;
+    }
+    const projected = simProject(start, saving, r, g, n);
+    const gap = projected - goal.target_krw;
+    const base = simProject(start, 0, r, g, n);
+    const perWon = simProject(0, 1, r, g, n); // balance from saving 1원/month (with growth)
+    const needed = perWon > 0 ? Math.max((goal.target_krw - base) / perWon, 0) : null;
+    const gapCls = gap >= 0 ? "gain-pos" : "gain-neg";
+    tr.innerHTML = `
+      <td>${goal.label || "목표"}</td>
+      <td>${goal.target_year}년 · ${goal.age}세</td>
+      <td>${fmtEok(goal.target_krw)}</td>
+      <td>${fmtEok(projected)}</td>
+      <td class="${gapCls}">${gap >= 0 ? "+" : ""}${fmtEok(gap)}</td>
+      <td>${needed == null ? "-" : needed === 0 ? "추가 저축 없이 가능" : fmtEok(needed) + "/월"}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  renderSimChart(start, saving, r, g, goals, nowYear, birth);
+}
+
+function renderSimChart(start, saving, r, g, goals, nowYear, birth) {
+  const svg = document.getElementById("simChart");
+  svg.innerHTML = "";
+  const ns = "http://www.w3.org/2000/svg";
+  const dated = goals.filter((x) => x.target_year && x.target_year >= nowYear);
+  const endYear = Math.max(nowYear + 10, ...dated.map((x) => x.target_year));
+  const years = [];
+  for (let y = nowYear; y <= endYear; y++) years.push(y);
+  const values = years.map((y) => y === nowYear ? start : simProject(start, saving, r, g, simMonthsUntilYearEnd(y)));
+
+  // narrower canvas on phones so labels stay legible after scaling
+  const W = svg.clientWidth && svg.clientWidth < 560 ? 420 : 800;
+  const H = 240, padL = 52, padR = 16, padT = 18, padB = 24;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  // log scale: 3억 and 100억 both stay readable on one chart
+  const all = [...values, ...dated.map((x) => x.target_krw)].filter((v) => v > 0);
+  if (!all.length) {
+    svg.innerHTML = `<text x="10" y="100" font-size="13" fill="${cssVar("--text-muted")}">순자산이나 월 저축액을 입력하면 그래프가 표시됩니다</text>`;
+    return;
+  }
+  const lo = Math.log10(Math.min(...all) * 0.8), hi = Math.log10(Math.max(...all) * 1.15);
+  const x = (y) => padL + ((y - nowYear) / Math.max(endYear - nowYear, 1)) * (W - padL - padR);
+  const yv = (v) => padT + (1 - (Math.log10(Math.max(v, 1)) - lo) / (hi - lo || 1)) * (H - padT - padB);
+  const el = (tag, attrs, text) => {
+    const e = document.createElementNS(ns, tag);
+    Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+    if (text != null) e.textContent = text;
+    svg.appendChild(e);
+    return e;
+  };
+
+  // gridlines at round 억 values
+  [1e8, 3e8, 1e9, 3e9, 1e10, 3e10].forEach((v) => {
+    const lv = Math.log10(v);
+    if (lv < lo || lv > hi) return;
+    el("line", { x1: padL, x2: W - padR, y1: yv(v), y2: yv(v), stroke: cssVar("--gridline"), "stroke-width": 1 });
+    el("text", { x: padL - 6, y: yv(v) + 4, "text-anchor": "end", "font-size": 10, fill: cssVar("--text-muted") }, fmtEok(v).replace("원", ""));
+  });
+  // x labels every 5 years
+  years.forEach((y) => {
+    const step = W < 600 ? 10 : 5;
+    if ((y - nowYear) % step !== 0 && y !== endYear) return;
+    const label = birth ? `${y}(${y - birth})` : `${y}`;
+    const anchor = y === endYear ? "end" : y === nowYear ? "start" : "middle";
+    el("text", { x: x(y), y: H - 6, "text-anchor": anchor, "font-size": 10, fill: cssVar("--text-secondary") }, label);
+  });
+
+  const valid = years.map((y, i) => [y, values[i]]).filter(([, v]) => v > 0);
+  if (valid.length > 1) {
+    el("path", {
+      d: valid.map(([y, v], i) => `${i ? "L" : "M"} ${x(y)} ${yv(v)}`).join(" "),
+      fill: "none", stroke: cssVar("--series-1"), "stroke-width": 2, "stroke-linejoin": "round",
+    });
+  }
+  dated.forEach((goal) => {
+    const projected = goal.target_year === nowYear ? start : simProject(start, saving, r, g, simMonthsUntilYearEnd(goal.target_year));
+    const hit = projected >= goal.target_krw;
+    const color = hit ? cssVar("--good") : cssVar("--critical");
+    const cx = x(goal.target_year), cy = yv(goal.target_krw);
+    el("rect", { x: cx - 5, y: cy - 5, width: 10, height: 10, fill: "none", stroke: color, "stroke-width": 2, transform: `rotate(45 ${cx} ${cy})` });
+    el("text", { x: Math.min(cx, W - padR - 4), y: cy - 9, "text-anchor": "end", "font-size": 10, fill: color }, fmtEok(goal.target_krw).replace("원", ""));
+  });
+}
+
+["simSaving", "simReturn", "simGrowth"].forEach((id) =>
+  document.getElementById(id).addEventListener("input", renderSimulator));
+document.getElementById("simResetBtn").addEventListener("click", () => {
+  simWriteInputs(simLedgerInputs());
+  renderSimulator();
+});
 
 function renderNetWorthHero(p) {
   const final = p.final_goal;
@@ -1474,6 +1687,40 @@ async function loadYearly() {
 
   renderYearlyTrend(data.months);
   buildYearlySheet(data.monthly_by_category_income, data.monthly_by_category);
+  loadBusiness(year, data.total_income);
+}
+
+// ---------- business income (Airbnb / consulting) ----------
+async function loadBusiness(year, totalIncome) {
+  let b;
+  try { b = await api(`/business/summary?year=${year}`); } catch (e) { console.error(e); return; }
+  setText("bizTitle", `${year}년 사업 소득 (에어비앤비 · 컨설팅)`);
+  setText("bizIncome", fmtKRW(b.total_income));
+  setText("bizExpense", fmtKRW(b.total_expense));
+  setText("bizNet", fmtKRW(b.net), "stat-value " + (b.net >= 0 ? "good" : "critical"));
+  const activeMonths = b.months.filter((m) => m.income || m.expense).length;
+  setText("bizAvg", activeMonths ? fmtKRW(Math.round(b.net / activeMonths)) : "-");
+  setText("bizShare", activeMonths
+    ? `기록 ${activeMonths}개월 기준` + (totalIncome > 0 ? ` · 전체 수입의 ${(b.total_income / totalIncome * 100).toFixed(0)}%` : "")
+    : "");
+
+  const lineBody = document.querySelector("#bizLineTable tbody");
+  lineBody.innerHTML = "";
+  const lines = Object.entries(b.by_line).sort((a, c) => c[1].net - a[1].net);
+  if (!lines.length) {
+    lineBody.innerHTML = `<tr><td colspan="4" class="empty-state">이 해에 사업소득·사업비용 기록이 없어요</td></tr>`;
+  }
+  lines.forEach(([name, v]) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${name}</td><td>${fmtKRW(v.income)}</td><td>${fmtKRW(v.expense)}</td>
+      <td class="${v.net >= 0 ? "gain-pos" : "gain-neg"}">${fmtSigned(v.net)}</td>`;
+    lineBody.appendChild(tr);
+  });
+
+  const monthBody = document.querySelector("#bizMonthTable tbody");
+  monthBody.innerHTML = lines.length ? `
+    <tr><th>월</th>${b.months.map((m) => `<th>${parseInt(m.month.slice(5), 10)}월</th>`).join("")}</tr>
+    <tr><td>순이익</td>${b.months.map((m) => `<td class="${m.net > 0 ? "gain-pos" : m.net < 0 ? "gain-neg" : "muted"}">${m.net ? fmtMillions(m.net) : "-"}</td>`).join("")}</tr>` : "";
 }
 
 document.querySelectorAll(".yearly-toggle-btn").forEach((btn) => {
@@ -1496,7 +1743,23 @@ document.getElementById("snapshotBtn").addEventListener("click", async () => {
   loadNetWorth();
 });
 
+// ---------- daily auto snapshot / backup status ----------
+async function loadJobsStatus() {
+  try {
+    const s = await api("/jobs/status");
+    const parts = [];
+    if (s.auto_snapshot_enabled) {
+      parts.push(s.last_snapshot_skipped_reason ? `자동 기록 대기(${s.last_snapshot_skipped_reason})` : "매일 자동 기록 켜짐");
+    }
+    if (s.latest_backup) parts.push(`백업 ${s.backup_count}개`);
+    const el = document.getElementById("jobsStatus");
+    el.textContent = parts.join(" · ");
+    el.title = `백업 폴더: ${s.backup_dir}${s.last_error ? `\n최근 오류: ${s.last_error}` : ""}`;
+  } catch (e) { console.error(e); }
+}
+
 // ---------- init ----------
+loadJobsStatus();
 document.getElementById("ledgerMonth").value = new Date().toISOString().slice(0, 7);
 loadOverview();
 loadNetWorth();

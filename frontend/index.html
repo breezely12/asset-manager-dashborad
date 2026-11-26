@@ -12,6 +12,8 @@
     <h1>성경의 경제적 자유 프로젝트</h1>
     <div class="header-actions">
       <span id="fxRate" class="muted"></span>
+      <span id="jobsStatus" class="muted"></span>
+      <a id="backupBtn" class="btn btn-secondary" href="/api/backup/download" title="데이터 전체를 파일로 내려받아 다른 곳에 보관하세요">백업 다운로드</a>
       <button id="snapshotBtn" class="btn btn-secondary">오늘 스냅샷 저장</button>
     </div>
   </header>
@@ -123,6 +125,30 @@
         <div class="stat-value" id="nwProjected">-</div>
         <div class="nw-sub" id="nwProjectedNote"></div>
       </div>
+    </div>
+
+    <div class="chart-card sim-card">
+      <div class="panel-header">
+        <h3>100억 시나리오 시뮬레이터</h3>
+        <span class="muted" id="simBasis"></span>
+      </div>
+      <form id="simForm" class="sim-inputs" onsubmit="return false">
+        <label>월 저축액(만원) <input type="number" id="simSaving" step="10" min="0" /></label>
+        <label>연 수익률(%) <input type="number" id="simReturn" step="0.5" /></label>
+        <label>저축액 연 증가율(%) <input type="number" id="simGrowth" step="0.5" /></label>
+        <button type="button" class="btn btn-secondary btn-small" id="simResetBtn">가계부 기준으로</button>
+      </form>
+      <div class="sim-headline" id="simHeadline">-</div>
+      <svg id="simChart" viewBox="0 0 800 240" class="sim-chart"></svg>
+      <div class="table-wrap">
+        <table class="data-table" id="simTable">
+          <thead>
+            <tr><th>목표</th><th>연도</th><th>목표 순자산</th><th>예상 순자산</th><th>차이</th><th>필요한 월 저축</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="muted nw-hint">매달 저축액을 더하고 전체 순자산이 연 수익률만큼 불어난다고 가정한 단순 계산입니다. 저축액은 해마다 증가율만큼 늘어납니다. 월 저축액 기본값은 최근 12개월 가계부의 (수입 − 소비)이고, 저축·투자, 연금·노후, 비상금으로 보낸 돈은 소비가 아니라 저축으로 봅니다. 세금, 물가, 큰 지출은 반영하지 않았습니다.</p>
     </div>
 
     <div class="chart-card">
@@ -319,6 +345,28 @@
         <div class="yearly-hbar-sub-title">결제수단별</div>
         <div class="yearly-hbar-list yearly-hbar-list-sm" id="yearlyPaymentBars"></div>
       </div>
+    </div>
+
+    <div class="chart-card biz-card">
+      <div class="panel-header">
+        <h3 id="bizTitle">사업 소득 (에어비앤비 · 컨설팅)</h3>
+      </div>
+      <div class="stat-row">
+        <div class="stat-tile"><div class="stat-label">사업 매출</div><div class="stat-value" id="bizIncome">-</div></div>
+        <div class="stat-tile"><div class="stat-label">사업 비용</div><div class="stat-value" id="bizExpense">-</div></div>
+        <div class="stat-tile"><div class="stat-label">사업 순이익</div><div class="stat-value" id="bizNet">-</div></div>
+        <div class="stat-tile"><div class="stat-label">월평균 순이익</div><div class="stat-value" id="bizAvg">-</div><div class="nw-sub" id="bizShare"></div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="bizLineTable">
+          <thead><tr><th>사업</th><th>매출</th><th>비용</th><th>순이익</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table biz-month-table" id="bizMonthTable"><tbody></tbody></table>
+      </div>
+      <p class="muted nw-hint" id="bizHint">가계부에서 대분류를 "사업소득"(수입) 또는 "사업비용"(지출)으로 고르면 여기에 모입니다. 소분류(에어비앤비, 컨설팅, 기타)별로 매출에서 비용을 뺀 순이익을 보여줍니다.</p>
     </div>
 
     <div class="chart-card">
