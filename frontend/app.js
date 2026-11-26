@@ -362,6 +362,200 @@ async function loadOverview() {
   renderGoalsList(goalsData);
 }
 
+// ---------- net worth (progress toward the final goal) ----------
+// Korean money units: 1억 = 1e8, 1만 = 1e4
+function fmtEok(n) {
+  if (n == null) return "-";
+  const abs = Math.abs(n);
+  if (abs >= 1e8) {
+    const eok = n / 1e8;
+    return new Intl.NumberFormat("ko-KR", { maximumFractionDigits: abs >= 1e10 ? 1 : 2 }).format(eok) + "억원";
+  }
+  return new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(Math.round(n / 1e4)) + "만원";
+}
+const fmtRate = (r) => r == null ? "-" : `${r >= 0 ? "" : "-"}${Math.abs(r * 100).toFixed(1)}%`;
+
+function setText(id, text, cls) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  if (cls !== undefined) el.className = cls;
+}
+
+async function loadNetWorth() {
+  const [p, goalsData] = await Promise.all([api("/networth/progress"), api("/goals")]);
+  renderNetWorthHero(p);
+  renderNetWorthPace(p);
+  renderGoalsTable(goalsData);
+}
+
+function renderNetWorthHero(p) {
+  const final = p.final_goal;
+  setText("nwCurrent", fmtEok(p.current_net_worth_krw));
+  if (!final) {
+    setText("nwGoalLabel", "최종 목표");
+    setText("nwTargetLine", "아래에서 목표를 추가하면 진행률이 표시됩니다.");
+    setText("nwPct", "-", "nw-hero-pct");
+    document.getElementById("nwFill").style.width = "0";
+    document.getElementById("nwTicks").innerHTML = "";
+    setText("nwRemaining", ""); setText("nwYearsLeft", "");
+    return;
+  }
+  const pct = Math.max(final.progress_pct ?? 0, 0);
+  const yearText = final.target_year ? ` · ${final.target_year}년(${final.age}세)` : ` · ${final.age}세`;
+  setText("nwGoalLabel", `현재 순자산 · ${final.label || "최종 목표"}`);
+  setText("nwTargetLine", `목표 ${fmtEok(final.target_krw)}${yearText}`);
+  setText("nwPct", `${pct < 10 ? pct.toFixed(2) : pct.toFixed(1)}%`, "nw-hero-pct" + (final.achieved ? " achieved" : ""));
+  const fill = document.getElementById("nwFill");
+  fill.style.width = `${Math.min(pct, 100)}%`;
+  fill.className = "nw-fill" + (final.achieved ? " achieved" : "");
+
+  const ticks = document.getElementById("nwTicks");
+  ticks.innerHTML = "";
+  p.milestones.forEach((m) => {
+    if (m.position_pct == null || m.position_pct <= 0 || m.position_pct >= 100) return;
+    const t = document.createElement("div");
+    t.className = "nw-tick" + (m.achieved ? " achieved" : "");
+    t.style.left = `${m.position_pct}%`;
+    t.title = `${m.label || "목표"} · ${m.target_year ? m.target_year + "년 · " : ""}${m.age}세`;
+    t.innerHTML = `<span>${fmtEok(m.target_krw)}</span>`;
+    ticks.appendChild(t);
+  });
+  // early milestones (3억, 5억 of 100억) sit very close together: flip the label
+  // of a tick above the bar when it would overlap the previous label below it
+  let lastBelow = -Infinity;
+  ticks.querySelectorAll(".nw-tick").forEach((t) => {
+    const left = parseFloat(t.style.left);
+    if (left - lastBelow < 7) t.classList.add("up");
+    else lastBelow = left;
+  });
+
+  setText("nwRemaining", final.achieved ? "목표 달성!" : `남은 금액 ${fmtEok(p.remaining_krw)}`);
+  if (p.years_left == null) setText("nwYearsLeft", "출생연도를 입력하면 남은 기간이 표시됩니다");
+  else setText("nwYearsLeft", `목표 연도까지 ${p.years_left.toFixed(1)}년`);
+}
+
+function renderNetWorthPace(p) {
+  const pace = p.pace || {};
+  const done = p.final_goal && p.final_goal.achieved;
+
+  if (done) {
+    setText("nwRequiredCagr", "달성", "stat-value good");
+    setText("nwRequiredCagrNote", "");
+  } else if (p.required_cagr != null) {
+    setText("nwRequiredCagr", `연 ${fmtRate(p.required_cagr)}`, "stat-value");
+    setText("nwRequiredCagrNote", "지금 순자산이 매년 이만큼 불어나야 합니다");
+  } else {
+    setText("nwRequiredCagr", "-", "stat-value");
+    setText("nwRequiredCagrNote", p.current_net_worth_krw <= 0 ? "순자산이 0 이하라 증가율은 계산할 수 없어요" : "");
+  }
+
+  if (!done && p.required_monthly_increase != null) {
+    setText("nwRequiredMonthly", fmtEok(p.required_monthly_increase), "stat-value");
+    setText("nwRequiredAnnual", `연 ${fmtEok(p.required_annual_increase)} · 같은 금액씩 늘린다면`);
+  } else {
+    setText("nwRequiredMonthly", "-", "stat-value");
+    setText("nwRequiredAnnual", "");
+  }
+
+  if (pace.span_days == null) {
+    setText("nwActualCagr", "-", "stat-value");
+    setText("nwActualNote", "스냅샷이 2개 이상 쌓이면 계산됩니다");
+  } else if (pace.actual_annual_increase == null) {
+    setText("nwActualCagr", "-", "stat-value");
+    setText("nwActualNote", `기록 ${pace.span_days}일 · 30일 이상 쌓이면 계산됩니다`);
+  } else {
+    const months = Math.round(pace.span_days / 30.4);
+    const onTrack = p.required_cagr != null && pace.actual_cagr != null ? pace.actual_cagr >= p.required_cagr : null;
+    const cls = "stat-value" + (onTrack === true ? " good" : onTrack === false ? " critical" : "");
+    setText("nwActualCagr", pace.actual_cagr != null ? `연 ${fmtRate(pace.actual_cagr)}` : "-", cls);
+    setText("nwActualNote", `${pace.since}부터 ${months}개월 · 연 ${fmtEok(pace.actual_annual_increase)} 증가`);
+  }
+
+  if (done) {
+    setText("nwProjected", "달성", "stat-value good");
+    setText("nwProjectedNote", "");
+  } else if (pace.projected_year_cagr != null || pace.projected_year_linear != null) {
+    const main = pace.projected_year_cagr ?? pace.projected_year_linear;
+    const targetYear = p.final_goal.target_year;
+    const cls = "stat-value" + (targetYear ? (main <= targetYear + 1 ? " good" : " critical") : "");
+    setText("nwProjected", `${Math.floor(main)}년`, cls);
+    const notes = [];
+    if (pace.projected_year_cagr != null) notes.push("같은 비율로 불어날 때");
+    if (pace.projected_year_linear != null && pace.projected_year_cagr != null) notes.push(`같은 금액씩 늘면 ${Math.floor(pace.projected_year_linear)}년`);
+    else if (pace.projected_year_linear != null) notes.push("같은 금액씩 늘 때");
+    setText("nwProjectedNote", notes.join(" · "));
+  } else {
+    setText("nwProjected", "-", "stat-value");
+    setText("nwProjectedNote", pace.actual_annual_increase != null && pace.actual_annual_increase <= 0
+      ? "기록 기간 동안 순자산이 늘지 않았어요" : "실제 증가율이 계산되면 표시됩니다");
+  }
+}
+
+function renderGoalsTable(goalsData) {
+  document.getElementById("nwBirthYear").value = goalsData.birth_year ?? "";
+  const tbody = document.querySelector("#goalsTable tbody");
+  tbody.innerHTML = "";
+  if (goalsData.goals.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">아직 목표가 없어요. "+ 목표 추가"로 시작하세요.</td></tr>`;
+    return;
+  }
+  goalsData.goals.forEach((g) => {
+    const pct = Math.max(g.progress_pct ?? 0, 0);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td></td>
+      <td>${g.age}세</td>
+      <td>${g.target_year ?? "-"}</td>
+      <td>${fmtEok(g.target_krw)}</td>
+      <td class="${g.achieved ? "good" : ""}">${g.achieved ? "달성" : pct.toFixed(1) + "%"}</td>
+      <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
+    `;
+    tr.firstElementChild.textContent = g.label || "목표";
+    tr.querySelector(".edit-btn").addEventListener("click", () => openGoalModal(g));
+    tr.querySelector(".del-btn").addEventListener("click", async () => {
+      if (confirm(`${g.label || "이 목표"}를 삭제할까요?`)) {
+        await api(`/goals/${g.id}`, { method: "DELETE" });
+        loadNetWorth(); loadOverview();
+      }
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+const goalModal = document.getElementById("goalModal");
+function openGoalModal(g) {
+  document.getElementById("goalModalTitle").textContent = g ? "목표 수정" : "목표 추가";
+  document.getElementById("g_id").value = g ? g.id : "";
+  document.getElementById("g_label").value = g ? (g.label ?? "") : "";
+  document.getElementById("g_age").value = g ? g.age : "";
+  document.getElementById("g_target_eok").value = g ? g.target_krw / 1e8 : "";
+  goalModal.classList.remove("hidden");
+}
+document.getElementById("addGoalBtn").addEventListener("click", () => openGoalModal(null));
+document.getElementById("goalCancelBtn").addEventListener("click", () => goalModal.classList.add("hidden"));
+document.getElementById("goalForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("g_id").value;
+  const body = {
+    label: document.getElementById("g_label").value.trim() || null,
+    age: parseInt(document.getElementById("g_age").value, 10),
+    target_krw: Math.round(parseFloat(document.getElementById("g_target_eok").value) * 1e8),
+  };
+  if (id) await api(`/goals/${id}`, { method: "PUT", body: JSON.stringify(body) });
+  else await api("/goals", { method: "POST", body: JSON.stringify(body) });
+  goalModal.classList.add("hidden");
+  loadNetWorth(); loadOverview();
+});
+document.getElementById("birthYearForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const birth_year = parseInt(document.getElementById("nwBirthYear").value, 10);
+  await api("/settings/birth_year", { method: "PUT", body: JSON.stringify({ birth_year }) });
+  setText("nwBirthYearMsg", "저장했어요");
+  setTimeout(() => setText("nwBirthYearMsg", ""), 2000);
+  loadNetWorth(); loadOverview();
+});
+document.querySelector('.tab-btn[data-tab="networth"]').addEventListener("click", loadNetWorth);
+
 // ---------- holdings ----------
 function renderSignedHBarList(containerId, items) {
   const container = document.getElementById(containerId);
@@ -1299,11 +1493,13 @@ document.querySelector('.tab-btn[data-tab="yearly"]').addEventListener("click", 
 document.getElementById("snapshotBtn").addEventListener("click", async () => {
   await api("/snapshot", { method: "POST" });
   loadOverview();
+  loadNetWorth();
 });
 
 // ---------- init ----------
 document.getElementById("ledgerMonth").value = new Date().toISOString().slice(0, 7);
 loadOverview();
+loadNetWorth();
 loadHoldings();
 loadLiabilities();
 loadLedger();

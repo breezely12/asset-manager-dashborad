@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import secrets
 from datetime import date
@@ -526,11 +527,127 @@ def create_goal(body: GoalIn):
         return {"id": cur.lastrowid}
 
 
+@app.put("/api/goals/{goal_id}")
+def update_goal(goal_id: int, body: GoalIn):
+    with get_conn() as conn:
+        existing = conn.execute("SELECT id FROM goals WHERE id = ?", (goal_id,)).fetchone()
+        if not existing:
+            raise HTTPException(404, "Goal not found")
+        conn.execute(
+            "UPDATE goals SET age=?, target_krw=?, label=? WHERE id=?",
+            (body.age, body.target_krw, body.label, goal_id),
+        )
+    return {"ok": True}
+
+
 @app.delete("/api/goals/{goal_id}")
 def delete_goal(goal_id: int):
     with get_conn() as conn:
         conn.execute("DELETE FROM goals WHERE id = ?", (goal_id,))
     return {"ok": True}
+
+
+# ---------- net worth progress toward the final goal ----------
+
+_MIN_PACE_DAYS = 30  # snapshots closer together than this are too noisy to extrapolate
+
+
+def _years_between(start: date, end: date) -> float:
+    return (end - start).days / 365.25
+
+
+@app.get("/api/networth/progress")
+def networth_progress():
+    """Progress and pace toward the largest goal (the 100억 target by default).
+
+    - required_*: what it takes to hit the final goal by its target year
+    - actual_*: the pace measured from the first and latest snapshots
+    - projected_*: when the final goal is reached if that pace continues
+    """
+    goals_data = list_goals()
+    current = goals_data["current_net_worth_krw"]
+    goals = goals_data["goals"]
+    if not goals:
+        return {"current_net_worth_krw": current, "final_goal": None, "milestones": []}
+
+    final = max(goals, key=lambda g: g["target_krw"])
+    target = final["target_krw"]
+    remaining = max(target - current, 0.0)
+    today = date.today()
+
+    years_left = None
+    if final["target_year"]:
+        # treat the goal as due at the end of the target year
+        years_left = max(_years_between(today, date(final["target_year"], 12, 31)), 0.0)
+
+    required_cagr = None
+    required_annual_increase = None
+    required_monthly_increase = None
+    if years_left and years_left > 0:
+        required_annual_increase = remaining / years_left
+        required_monthly_increase = remaining / (years_left * 12)
+        if current > 0 and remaining > 0:
+            required_cagr = (target / current) ** (1 / years_left) - 1
+
+    with get_conn() as conn:
+        snaps = conn.execute("SELECT date, total_krw FROM snapshots ORDER BY date").fetchall()
+
+    pace = {
+        "since": None,
+        "span_days": None,
+        "actual_cagr": None,
+        "actual_annual_increase": None,
+        "projected_year_cagr": None,
+        "projected_year_linear": None,
+    }
+    if len(snaps) >= 2:
+        first, last = snaps[0], snaps[-1]
+        d0 = date.fromisoformat(first["date"])
+        d1 = date.fromisoformat(last["date"])
+        span_days = (d1 - d0).days
+        pace["since"] = first["date"]
+        pace["span_days"] = span_days
+        if span_days >= _MIN_PACE_DAYS:
+            span_years = span_days / 365.25
+            v0, v1 = first["total_krw"], last["total_krw"]
+            annual_increase = (v1 - v0) / span_years
+            pace["actual_annual_increase"] = annual_increase
+            if v0 > 0 and v1 > 0:
+                pace["actual_cagr"] = (v1 / v0) ** (1 / span_years) - 1
+            if remaining > 0:
+                cagr = pace["actual_cagr"]
+                if cagr is not None and cagr > 0 and current > 0:
+                    yrs = math.log(target / current) / math.log(1 + cagr)
+                    pace["projected_year_cagr"] = round(today.year + yrs, 1)
+                if annual_increase > 0:
+                    pace["projected_year_linear"] = round(today.year + remaining / annual_increase, 1)
+
+    milestones = [
+        {
+            "id": g["id"],
+            "label": g["label"],
+            "age": g["age"],
+            "target_year": g["target_year"],
+            "target_krw": g["target_krw"],
+            "achieved": g["achieved"],
+            "position_pct": g["target_krw"] / target * 100 if target else None,
+        }
+        for g in sorted(goals, key=lambda g: g["target_krw"])
+        if g["id"] != final["id"]
+    ]
+
+    return {
+        "current_net_worth_krw": current,
+        "birth_year": goals_data["birth_year"],
+        "final_goal": final,
+        "remaining_krw": remaining,
+        "years_left": years_left,
+        "required_cagr": required_cagr,
+        "required_annual_increase": required_annual_increase,
+        "required_monthly_increase": required_monthly_increase,
+        "pace": pace,
+        "milestones": milestones,
+    }
 
 
 # ---------- liabilities ----------
