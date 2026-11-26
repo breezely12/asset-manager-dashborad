@@ -100,10 +100,15 @@ class GoalIn(BaseModel):
     label: Optional[str] = None
 
 
+LIABILITY_KINDS = ("mortgage", "jeonse", "credit", "business", "other")
+
+
 class LiabilityIn(BaseModel):
     name: str
     balance_krw: float
     note: Optional[str] = None
+    kind: Literal["mortgage", "jeonse", "credit", "business", "other"] = "other"
+    interest_rate: Optional[float] = None  # annual %, None if interest-free
 
 
 class BirthYearIn(BaseModel):
@@ -266,6 +271,16 @@ def summary():
         liabilities = [dict(r) for r in conn.execute("SELECT * FROM liabilities")]
     total_liabilities_krw = sum(l["balance_krw"] for l in liabilities)
     net_worth_krw = total_krw - total_liabilities_krw
+    liabilities_by_kind = {k: 0.0 for k in LIABILITY_KINDS}
+    annual_interest_krw = 0.0
+    for l in liabilities:
+        kind = l.get("kind") if l.get("kind") in liabilities_by_kind else "other"
+        liabilities_by_kind[kind] += l["balance_krw"]
+        if l.get("interest_rate"):
+            annual_interest_krw += l["balance_krw"] * l["interest_rate"] / 100
+    # balance-weighted rate over interest-bearing debt only, so 0% 전세보증금 doesn't dilute it
+    interest_bearing = sum(l["balance_krw"] for l in liabilities if l.get("interest_rate"))
+    avg_interest_rate = (annual_interest_krw / interest_bearing * 100) if interest_bearing else None
 
     return {
         "fx_usdkrw": fx,
@@ -274,6 +289,9 @@ def summary():
         "total_gain_krw": total_gain_krw,
         "total_gain_pct": total_gain_pct,
         "total_liabilities_krw": total_liabilities_krw,
+        "liabilities_by_kind": liabilities_by_kind,
+        "annual_interest_krw": annual_interest_krw,
+        "avg_interest_rate": avg_interest_rate,
         "net_worth_krw": net_worth_krw,
         "by_category": by_category,
         "price_failures": sum(1 for h in enriched if h["price_ok"] is False),
@@ -808,8 +826,8 @@ def list_liabilities():
 def create_liability(body: LiabilityIn):
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO liabilities (name, balance_krw, note) VALUES (?, ?, ?)",
-            (body.name, body.balance_krw, body.note),
+            "INSERT INTO liabilities (name, balance_krw, note, kind, interest_rate) VALUES (?, ?, ?, ?, ?)",
+            (body.name, body.balance_krw, body.note, body.kind, body.interest_rate),
         )
         return {"id": cur.lastrowid}
 
@@ -821,8 +839,9 @@ def update_liability(liability_id: int, body: LiabilityIn):
         if not existing:
             raise HTTPException(404, "Liability not found")
         conn.execute(
-            "UPDATE liabilities SET name=?, balance_krw=?, note=?, updated_at=datetime('now') WHERE id=?",
-            (body.name, body.balance_krw, body.note, liability_id),
+            "UPDATE liabilities SET name=?, balance_krw=?, note=?, kind=?, interest_rate=?, "
+            "updated_at=datetime('now') WHERE id=?",
+            (body.name, body.balance_krw, body.note, body.kind, body.interest_rate, liability_id),
         )
     return {"ok": True}
 

@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS liabilities (
     name TEXT NOT NULL,
     balance_krw REAL NOT NULL,
     note TEXT,
+    kind TEXT NOT NULL DEFAULT 'other',
+    interest_rate REAL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -87,6 +89,12 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE transactions ADD COLUMN count_in_total INTEGER NOT NULL DEFAULT 1"
             )
+        liab_columns = {row["name"] for row in conn.execute("PRAGMA table_info(liabilities)")}
+        if "kind" not in liab_columns:
+            conn.execute("ALTER TABLE liabilities ADD COLUMN kind TEXT NOT NULL DEFAULT 'other'")
+        if "interest_rate" not in liab_columns:
+            # annual rate in percent (e.g. 4.2); NULL for interest-free debt like 전세보증금
+            conn.execute("ALTER TABLE liabilities ADD COLUMN interest_rate REAL")
         if conn.execute("SELECT COUNT(*) FROM goals").fetchone()[0] == 0:
             conn.executemany(
                 "INSERT INTO goals (age, target_krw, label) VALUES (?, ?, ?)", _DEFAULT_GOALS
