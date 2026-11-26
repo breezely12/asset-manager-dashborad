@@ -25,10 +25,29 @@ python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
   연평균 증가율·월평균 증가액, 스냅샷 기록 기준 실제 증가율과 예상 도달 연도, 목표·출생연도 설정
 - **가계부**: 월별 수입/지출 입력, 카테고리별 지출 분석
 
+- **100억 시나리오 시뮬레이터**(순자산 탭): 월 저축액·연 수익률·저축 증가율을 넣으면 목표별 예상 순자산,
+  부족분, 필요한 월 저축액, 최종 목표 도달 연도를 계산. 월 저축액 기본값은 최근 12개월 가계부 평균
+- **사업 소득**(연간 리포트 탭): 가계부 대분류 "사업소득"/"사업비용"을 에어비앤비·컨설팅별 순이익으로 집계
+- **매일 자동 기록과 백업**: 서버가 켜져 있으면 한 시간마다 오늘 순자산 스냅샷을 갱신하고(시세 조회 실패 시 건너뜀),
+  하루 한 번 DB 백업 파일을 만듭니다. 상단 "백업 다운로드"로 언제든 파일을 받을 수 있습니다.
+
 ## 데이터
 
 `data/asset_manager.db` (SQLite)에 저장됩니다. 외부로 전송되지 않으며,
 가격 조회만 Yahoo Finance / CoinGecko에 네트워크 요청을 보냅니다.
+
+### 백업 설정 (환경변수)
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `BACKUP_DIR` | `data/backups` | 백업 폴더. iCloud Drive·Google Drive·Dropbox 같은 동기화 폴더로 지정하면 컴퓨터를 잃어도 사본이 남습니다 |
+| `BACKUP_KEEP` | `30` | 보관할 일일 백업 개수 |
+| `AUTO_SNAPSHOT` | `1` | `0`이면 자동 스냅샷 끄기 |
+
+```bash
+BACKUP_DIR=~/Library/Mobile\ Documents/com~apple~CloudDocs/asset-backups \
+  python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
 
 ## 구조
 
