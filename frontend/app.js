@@ -8,6 +8,20 @@ const CATEGORY_COLOR_VAR = {
 };
 const CATEGORY_ORDER = ["stock", "crypto", "cash", "realestate", "other"];
 
+const LIABILITY_KIND_LABEL = {
+  mortgage: "주택담보대출", jeonse: "전세보증금", credit: "신용대출", business: "사업자대출", other: "기타 부채",
+};
+const LIABILITY_KIND_ORDER = ["mortgage", "jeonse", "credit", "business", "other"];
+// debts share one warm hue family so they read as "minus" next to the asset colors
+// (asset categories already use --series-1..5, so debts avoid those)
+const LIABILITY_KIND_COLOR = {
+  mortgage: "var(--series-8)",
+  jeonse: "color-mix(in srgb, var(--series-8) 55%, var(--surface-1))",
+  credit: "var(--series-7)",
+  business: "var(--series-6)",
+  other: "var(--text-muted)",
+};
+
 // household-ledger 대분류 -> 소분류, following the user's reference budget sheet
 const LEDGER_CATEGORY_TAXONOMY = {
   "수입": ["본인월급", "본인상여", "부수입", "투자소득", "기타소득", "양육비"],
@@ -385,8 +399,9 @@ function setText(id, text, cls) {
 }
 
 async function loadNetWorth() {
-  const [p, goalsData] = await Promise.all([api("/networth/progress"), api("/goals")]);
+  const [p, goalsData, summary] = await Promise.all([api("/networth/progress"), api("/goals"), api("/summary")]);
   renderNetWorthHero(p);
+  renderNetWorthComposition(summary);
   renderNetWorthPace(p);
   renderGoalsTable(goalsData);
   loadSimulator();
@@ -647,6 +662,67 @@ function renderNetWorthHero(p) {
   else setText("nwYearsLeft", `목표 연도까지 ${p.years_left.toFixed(1)}년`);
 }
 
+// Three stacked bars on one scale (total assets = 100%): assets by category,
+// liabilities by kind, and what's left as net worth.
+function renderNetWorthComposition(summary) {
+  const rows = document.getElementById("nwCompRows");
+  const legend = document.getElementById("nwCompLegend");
+  rows.innerHTML = ""; legend.innerHTML = "";
+  const totalAssets = summary.total_krw || 0;
+  const totalDebt = summary.total_liabilities_krw || 0;
+  const scale = Math.max(totalAssets, totalDebt, 1);
+
+  const assetSegs = CATEGORY_ORDER
+    .map((c) => ({ label: CATEGORY_LABEL[c], value: summary.by_category[c] || 0, color: `var(${CATEGORY_COLOR_VAR[c]})` }))
+    .filter((x) => x.value > 0);
+  const debtSegs = LIABILITY_KIND_ORDER
+    .map((k) => ({ label: LIABILITY_KIND_LABEL[k], value: (summary.liabilities_by_kind || {})[k] || 0, color: LIABILITY_KIND_COLOR[k] }))
+    .filter((x) => x.value > 0);
+  const net = summary.net_worth_krw || 0;
+
+  if (totalAssets === 0 && totalDebt === 0) {
+    rows.innerHTML = `<p class="muted">자산 목록 탭에서 자산과 부채를 입력하면 구성이 표시됩니다.</p>`;
+    setText("nwInterestLine", "");
+    return;
+  }
+
+  const addRow = (title, total, segs, opts = {}) => {
+    const row = document.createElement("div");
+    row.className = "nw-comp-row";
+    row.innerHTML = `<div class="nw-comp-label">${title}</div><div class="nw-comp-track"></div><div class="nw-comp-value ${opts.cls || ""}">${opts.text ?? fmtEok(total)}</div>`;
+    const track = row.querySelector(".nw-comp-track");
+    segs.forEach((seg) => {
+      const el = document.createElement("div");
+      el.className = "nw-comp-seg";
+      el.style.width = `${seg.value / scale * 100}%`;
+      el.style.background = seg.color;
+      el.title = `${seg.label} ${fmtEok(seg.value)} (${(seg.value / (total || 1) * 100).toFixed(1)}%)`;
+      track.appendChild(el);
+    });
+    rows.appendChild(row);
+  };
+  addRow("자산", totalAssets, assetSegs);
+  addRow("부채", totalDebt, debtSegs, { text: totalDebt ? "−" + fmtEok(totalDebt) : "0원" });
+  addRow("순자산", net, net > 0 ? [{ label: "순자산", value: net, color: "var(--series-1)" }] : [],
+    { cls: net < 0 ? "critical" : "", text: fmtEok(net) });
+
+  [...assetSegs, ...debtSegs].forEach((seg) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="swatch"></span><span></span><span class="legend-value">${fmtEok(seg.value)}</span>`;
+    li.querySelector(".swatch").style.background = seg.color;
+    li.children[1].textContent = seg.label;
+    legend.appendChild(li);
+  });
+
+  const parts = [];
+  if (totalAssets > 0 && totalDebt > 0) parts.push(`부채비율 ${(totalDebt / totalAssets * 100).toFixed(1)}%`);
+  if (summary.annual_interest_krw > 0) {
+    parts.push(`연 이자 약 ${fmtEok(summary.annual_interest_krw)} (월 ${fmtEok(summary.annual_interest_krw / 12)})`);
+    if (summary.avg_interest_rate != null) parts.push(`평균 금리 ${summary.avg_interest_rate.toFixed(2)}%`);
+  }
+  setText("nwInterestLine", parts.join(" · "));
+}
+
 function renderNetWorthPace(p) {
   const pace = p.pace || {};
   const done = p.final_goal && p.final_goal.achieved;
@@ -852,15 +928,21 @@ async function loadLiabilities() {
   tbody.innerHTML = "";
   liabilities.forEach((l) => {
     const tr = document.createElement("tr");
+    const rate = l.interest_rate;
     tr.innerHTML = `
-      <td>${l.name}</td>
-      <td>${l.note ?? ""}</td>
+      <td>${LIABILITY_KIND_LABEL[l.kind] || LIABILITY_KIND_LABEL.other}</td>
+      <td></td>
+      <td></td>
+      <td>${rate ? rate + "%" : "-"}</td>
       <td>${fmtKRW(l.balance_krw)}</td>
+      <td>${rate ? fmtKRW(Math.round(l.balance_krw * rate / 100)) : "-"}</td>
       <td><button class="btn btn-small edit-btn">수정</button> <button class="btn btn-small btn-danger del-btn">삭제</button></td>
     `;
+    tr.children[1].textContent = l.name;
+    tr.children[2].textContent = l.note ?? "";
     tr.querySelector(".edit-btn").addEventListener("click", () => openLiabilityModal(l));
     tr.querySelector(".del-btn").addEventListener("click", async () => {
-      if (confirm(`${l.name}을 삭제할까요?`)) { await api(`/liabilities/${l.id}`, { method: "DELETE" }); loadLiabilities(); loadOverview(); }
+      if (confirm(`${l.name}을 삭제할까요?`)) { await api(`/liabilities/${l.id}`, { method: "DELETE" }); loadLiabilities(); loadOverview(); loadNetWorth(); }
     });
     tbody.appendChild(tr);
   });
@@ -873,6 +955,8 @@ function openLiabilityModal(l) {
   document.getElementById("l_name").value = l?.name ?? "";
   document.getElementById("l_balance").value = l?.balance_krw ?? "";
   document.getElementById("l_note").value = l?.note ?? "";
+  document.getElementById("l_kind").value = l?.kind ?? "mortgage";
+  document.getElementById("l_rate").value = l?.interest_rate ?? "";
   liabilityModal.classList.remove("hidden");
 }
 document.getElementById("addLiabilityBtn").addEventListener("click", () => openLiabilityModal(null));
@@ -884,12 +968,15 @@ document.getElementById("liabilityForm").addEventListener("submit", async (e) =>
     name: document.getElementById("l_name").value,
     balance_krw: parseFloat(document.getElementById("l_balance").value),
     note: document.getElementById("l_note").value || null,
+    kind: document.getElementById("l_kind").value,
+    interest_rate: document.getElementById("l_rate").value === "" ? null : parseFloat(document.getElementById("l_rate").value),
   };
   if (id) await api(`/liabilities/${id}`, { method: "PUT", body: JSON.stringify(body) });
   else await api("/liabilities", { method: "POST", body: JSON.stringify(body) });
   liabilityModal.classList.add("hidden");
   loadLiabilities();
   loadOverview();
+  loadNetWorth();
 });
 
 // ---------- holding modal ----------

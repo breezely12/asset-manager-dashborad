@@ -103,6 +103,15 @@
       </div>
     </div>
 
+    <div class="chart-card nw-comp">
+      <div class="panel-header">
+        <h3>순자산 구성</h3>
+        <span class="muted" id="nwInterestLine"></span>
+      </div>
+      <div id="nwCompRows"></div>
+      <ul class="legend nw-comp-legend" id="nwCompLegend"></ul>
+    </div>
+
     <h3 class="nw-section-title">목표까지의 속도</h3>
     <div class="stat-row">
       <div class="stat-tile">
@@ -212,7 +221,7 @@
     <div class="table-wrap">
       <table class="data-table" id="liabilitiesTable">
         <thead>
-          <tr><th>이름</th><th>메모</th><th>잔액(KRW)</th><th></th></tr>
+          <tr><th>종류</th><th>이름</th><th>메모</th><th>금리</th><th>잔액(KRW)</th><th>연 이자(추정)</th><th></th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -538,7 +547,19 @@
     <form id="liabilityForm">
       <input type="hidden" id="l_id" />
       <label>이름 <input type="text" id="l_name" required placeholder="예: KB 내집마련디딤돌대출" /></label>
-      <label>잔액(KRW) <input type="number" step="any" id="l_balance" required /></label>
+      <label>종류
+        <select id="l_kind">
+          <option value="mortgage">주택담보대출</option>
+          <option value="jeonse">전세보증금(받은 돈)</option>
+          <option value="credit">신용대출</option>
+          <option value="business">사업자대출</option>
+          <option value="other">기타</option>
+        </select>
+      </label>
+      <div class="field-row">
+        <label>잔액(KRW) <input type="number" step="any" id="l_balance" required /></label>
+        <label>연 금리(%) <input type="number" step="any" min="0" id="l_rate" placeholder="무이자면 비움" /></label>
+      </div>
       <label>메모 <input type="text" id="l_note" /></label>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="liabilityCancelBtn">취소</button>
